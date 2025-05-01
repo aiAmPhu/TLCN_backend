@@ -1,4 +1,6 @@
 import AdmissionWishes from "../models/admissionWishes.js";
+import AdmissionQuantity from "../models/admissionQuantity.js";
+import { Op } from "sequelize";
 
 export const addAdmissionWish = async (req, res) => {
     try {
@@ -180,5 +182,88 @@ export const getAcceptedWish = async (req, res) => {
     } catch (error) {
         console.error("Lỗi khi lấy danh sách nguyện vọng đã được chấp nhận:", error);
         res.status(500).json({ message: "Đã xảy ra lỗi khi lấy danh sách nguyện vọng đã được chấp nhận." });
+    }
+};
+
+export const filterAdmissionResults = async (req, res) => {
+    try {
+        // Lấy toàn bộ nguyện vọng
+        const wishes = await AdmissionWishes.findAll({
+            where: {
+                status: { [Op.not]: "accepted" },
+            },
+            raw: true,
+        });
+
+        // Lấy chỉ tiêu từ bảng Quantity
+        const quantities = await AdmissionQuantity.findAll({ raw: true });
+        const quotaMap = {};
+        for (const q of quantities) {
+            const key = `${q.criteriaId}-${q.majorId}`;
+            quotaMap[key] = q.quantity ?? 0;
+        }
+
+        // Gom nhóm theo criteriaId-majorId
+        const grouped = {};
+        for (const wish of wishes) {
+            const key = `${wish.criteriaId}-${wish.majorId}`;
+            if (!grouped[key]) grouped[key] = [];
+            grouped[key].push(wish);
+        }
+
+        const acceptedWishes = [];
+        const acceptedUserIds = new Set();
+
+        // Lọc theo từng nhóm
+        for (const key in grouped) {
+            const group = grouped[key];
+            const quota = quotaMap[key] || 0;
+
+            // Sắp xếp theo điểm giảm dần → ưu tiên tăng dần
+            group.sort((a, b) => {
+                if (b.scores !== a.scores) return b.scores - a.scores;
+                return a.priority - b.priority;
+            });
+
+            let count = 0;
+            for (const wish of group) {
+                if (count >= quota) break;
+                if (!acceptedUserIds.has(wish.uId)) {
+                    acceptedWishes.push(wish);
+                    acceptedUserIds.add(wish.uId);
+                    count++;
+                }
+            }
+        }
+
+        // Cập nhật kết quả vào DB
+        const acceptedIds = acceptedWishes.map((w) => w.wishId);
+        const updatePromises = wishes.map((wish) => {
+            const status = acceptedIds.includes(wish.wishId) ? "accepted" : "rejected";
+            return AdmissionWishes.update({ status }, { where: { wishId: wish.wishId } });
+        });
+
+        await Promise.all(updatePromises);
+
+        res.status(200).json({
+            message: "Đã lọc và cập nhật kết quả tuyển sinh thành công.",
+        });
+    } catch (error) {
+        console.error("Lỗi lọc kết quả tuyển sinh:", error);
+        res.status(500).json({ message: "Đã xảy ra lỗi trong quá trình lọc." });
+    }
+};
+
+export const resetAllWishesStatus = async (req, res) => {
+    try {
+        const [affectedRows] = await AdmissionWishes.update({ status: "waiting" }, { where: {} });
+        res.status(200).json({
+            message: `Đã đặt lại trạng thái cho ${affectedRows} nguyện vọng.`,
+        });
+    } catch (error) {
+        console.error("Lỗi khi cập nhật trạng thái:", error);
+        res.status(500).json({
+            message: "Đã xảy ra lỗi khi đặt lại trạng thái nguyện vọng.",
+        });
     }
 };
