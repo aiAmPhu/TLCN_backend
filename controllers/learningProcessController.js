@@ -1,4 +1,4 @@
-import LearningProcess from "../models/learningProcess.js"; // Giả sử đây là đường dẫn model của bạn
+import LearningProcess from "../models/learningProcess.js";
 
 export const addLearningProcess = async (req, res) => {
     try {
@@ -22,7 +22,7 @@ export const addLearningProcess = async (req, res) => {
         if (existingProcess) {
             return res.status(400).json({ message: "User đã có quá trình học tập!" });
         }
-        const newProcess = await LearningProcess.create({
+        await LearningProcess.create({
             userId,
             grade10_province,
             grade10_district,
@@ -42,6 +42,11 @@ export const addLearningProcess = async (req, res) => {
             message: "Thêm quá trình học tập thành công!",
         });
     } catch (error) {
+        if (error instanceof Sequelize.ForeignKeyConstraintError) {
+            return res.status(422).json({
+                message: "Dữ liệu không hợp lệ: liên kết khóa ngoại không tồn tại (userId không tồn tại).",
+            });
+        }
         console.error("Lỗi khi thêm quá trình học tập:", error);
         res.status(500).json({ message: "Đã xảy ra lỗi khi thêm quá trình học tập." });
     }
@@ -69,14 +74,11 @@ export const updateLearningProcess = async (req, res) => {
 
 export const deleteLearningProcess = async (req, res) => {
     const { userId } = req.params;
-
     try {
         const deletedCount = await LearningProcess.destroy({ where: { userId } });
-
         if (deletedCount === 0) {
             return res.status(404).json({ message: "Không tìm thấy quá trình học tập để xoá." });
         }
-
         res.status(200).json({ message: "Xoá quá trình học tập thành công." });
     } catch (error) {
         console.error("Lỗi khi xoá quá trình học tập:", error);

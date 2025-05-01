@@ -7,7 +7,7 @@ export const addPhotoID = async (req, res) => {
         if (existingPhoto) {
             return res.status(400).json({ message: "User đã tồn tại." });
         }
-        const newPhoto = await PhotoID.create({
+        await PhotoID.create({
             userId,
             personalPic,
             frontCCCD,
@@ -20,6 +20,11 @@ export const addPhotoID = async (req, res) => {
         });
         res.status(201).json({ message: "Thêm ảnh thành công!" });
     } catch (error) {
+        if (error instanceof Sequelize.ForeignKeyConstraintError) {
+            return res.status(422).json({
+                message: "Dữ liệu không hợp lệ: liên kết khóa ngoại không tồn tại (userId không tồn tại).",
+            });
+        }
         console.error("Lỗi khi thêm ảnh:", error);
         res.status(500).json({ message: "Đã xảy ra lỗi khi thêm ảnh", error: error.message });
     }
@@ -82,7 +87,6 @@ export const updatePhotoID = async (req, res) => {
 
 export const getAllPhotos = async (req, res) => {
     try {
-        // Lấy toàn bộ dữ liệu từ bảng PhotoID
         const photos = await PhotoID.findAll();
         if (photos.length === 0) {
             return res.status(404).json({ message: "Không có ảnh hồ sơ nào!" });

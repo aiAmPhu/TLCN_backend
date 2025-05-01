@@ -73,8 +73,8 @@ export const addUser = async (req, res) => {
 
 export const getAllUsers = async (req, res) => {
     try {
-        const users = await User.findAll(); // Lấy tất cả bản ghi trong bảng users
-        res.status(200).json({ message: "Lấy thông tin người dùng thành công", data: users }); // Trả về danh sách users dưới dạng JSON
+        const users = await User.findAll();
+        res.status(200).json({ message: "Lấy thông tin người dùng thành công", data: users });
     } catch (error) {
         console.error("Lối khi lấy thông tin người dùng:", error.message);
         res.status(500).json({ message: "Lỗi trong quá trình lấy thông tin" });
@@ -130,7 +130,6 @@ export const sendOTP = async (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ message: "Email is required" });
     try {
-        // Kiểm tra email đã tồn tại chưa
         const existingUser = await User.findOne({ where: { email } });
         if (existingUser) {
             return res.status(400).json({ message: "Email đã được đăng ký!" });

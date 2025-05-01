@@ -12,7 +12,7 @@ export const addAdYear = async (req, res) => {
             yearName,
             startDate,
             endDate,
-            status: status || "inactive", // Mặc định nếu không có status sẽ là "inactive"
+            status: status || "inactive",
         });
         res.status(201).json({ message: "Thêm năm tuyển sinh thành công!" });
     } catch (error) {
@@ -23,9 +23,8 @@ export const addAdYear = async (req, res) => {
 
 export const getAllAdYears = async (req, res) => {
     try {
-        // Lấy tất cả các bản ghi từ bảng AdYear
         const adYears = await AdYear.findAll({
-            order: [["yearId", "DESC"]], // Sắp xếp theo yearId giảm dần (mới nhất trước)
+            order: [["yearId", "DESC"]],
         });
         res.status(200).json({ message: "Lấy danh sách năm tuyển sinh thành công!", data: adYears });
     } catch (error) {
@@ -64,14 +63,3 @@ export const deleteAdYear = async (req, res) => {
         res.status(500).json({ message: "Đã xảy ra lỗi khi xóa năm tuyển sinh." });
     }
 };
-
-// export const getAllYearMajors = async (req, res) => {
-//     try {
-//         // Chỉ lấy trường yearMajors
-//         const { id } = req.params;
-//         const years = await AdYear.find(id).select("yearMajors");
-//         res.status(200).json(years);
-//     } catch (error) {
-//         res.status(500).json({ message: error.message });
-//     }
-// };

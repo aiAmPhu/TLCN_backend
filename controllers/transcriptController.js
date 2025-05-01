@@ -12,7 +12,6 @@ export const addTranscript = async (req, res) => {
             if (semester === "Học kỳ 1") merged[year].score1 = score;
             if (semester === "Học kỳ 2") merged[year].score2 = score;
         }
-
         return Object.entries(merged).map(([year, scores]) => ({
             year,
             score1: scores.score1 ?? null,
@@ -57,7 +56,6 @@ export const addTranscript = async (req, res) => {
                 await transaction.rollback();
                 return res.status(400).json({ message: `Môn học ${subjectName} không tồn tại trong hệ thống!` });
             }
-
             // Duyệt qua từng điểm của môn học và thêm điểm vào bảng scores
             const mergedScores = mergeSemesters(scores[subjectName]);
             for (const entry of mergedScores) {
@@ -77,6 +75,11 @@ export const addTranscript = async (req, res) => {
         await transaction.commit(); // Lưu dữ liệu nếu không có lỗi
         res.status(201).json({ message: "Thêm học bạ thành công!" });
     } catch (error) {
+        if (error instanceof Sequelize.ForeignKeyConstraintError) {
+            return res.status(422).json({
+                message: "Dữ liệu không hợp lệ: liên kết khóa ngoại không tồn tại (userId không tồn tại).",
+            });
+        }
         await transaction.rollback(); // Hủy thao tác nếu có lỗi
         console.error("Lỗi:", error);
         res.status(500).json({ message: "Có lỗi xảy ra, vui lòng thử lại sau!" });
@@ -86,7 +89,6 @@ export const addTranscript = async (req, res) => {
 export const updateTranscript = async (req, res) => {
     const { scores } = req.body;
     const { userId } = req.params;
-
     const mergeSemesters = (subjectScores) => {
         const merged = {};
         for (const entry of subjectScores) {
@@ -95,24 +97,18 @@ export const updateTranscript = async (req, res) => {
             if (semester === "Học kỳ 1") merged[year].score1 = score;
             if (semester === "Học kỳ 2") merged[year].score2 = score;
         }
-
         return Object.entries(merged).map(([year, scores]) => ({
             year,
             score1: scores.score1 ?? null,
             score2: scores.score2 ?? null,
         }));
     };
-
     const transaction = await sequelize.transaction();
-
     try {
         const transcript = await Transcript.findOne({ where: { userId }, transaction });
-
         if (!transcript) {
             return res.status(404).json({ message: "Không tìm thấy học bạ của người dùng!" });
         }
-
-        // Reset status + feedback
         await transcript.update(
             {
                 status: "waiting",
@@ -120,30 +116,25 @@ export const updateTranscript = async (req, res) => {
             },
             { transaction }
         );
-
         // Xóa điểm cũ
         await Score.destroy({
             where: { transcriptId: transcript.tId },
             transaction,
         });
-
         // Lấy danh sách môn học
         const subjects = await Subject.findAll({ attributes: ["suId", "subject"], transaction });
-
         // Lấy scId hiện tại
         const lastScore = await Score.findOne({
             order: [["scId", "DESC"]],
             transaction,
         });
         let newScoreId = lastScore ? lastScore.scId + 1 : 1;
-
         for (const subjectName in scores) {
             const subject = subjects.find((subj) => subj.subject === subjectName);
             if (!subject) {
                 await transaction.rollback();
                 return res.status(400).json({ message: `Môn học ${subjectName} không tồn tại trong hệ thống!` });
             }
-
             const mergedScores = mergeSemesters(scores[subjectName]);
             for (const entry of mergedScores) {
                 await Score.create(
@@ -159,7 +150,6 @@ export const updateTranscript = async (req, res) => {
                 );
             }
         }
-
         await transaction.commit();
         res.status(200).json({ message: "Cập nhật học bạ thành công!" });
     } catch (error) {
@@ -254,17 +244,14 @@ export const getTranscriptByUserId = async (req, res) => {
 
 export const getTranscriptStatusByUserId = async (req, res) => {
     const { userId } = req.params;
-
     try {
         const transcript = await Transcript.findOne({
             where: { userId },
             attributes: ["status"],
         });
-
         if (!transcript) {
             return res.status(404).json({ message: "Không tìm thấy học bạ cho người dùng này." });
         }
-
         res.status(200).json({ message: "Lấy trạng thái thành công", status: transcript.status });
     } catch (error) {
         console.error("Lỗi khi lấy trạng thái học bạ:", error);

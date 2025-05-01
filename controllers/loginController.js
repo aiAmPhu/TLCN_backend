@@ -37,22 +37,3 @@ export const loginFunction = async (req, res) => {
         return res.status(500).json({ message: "Lỗi hệ thống. Vui lòng thử lại sau." });
     }
 };
-export const protectedFunction = async (req, res) => {
-    try {
-        const token = req.headers.authorization?.split(" ")[1]; // Lấy token từ headers
-
-        if (!token) {
-            return res.status(403).json({ message: "No token provided" });
-        }
-
-        try {
-            const decoded = jwt.verify(token, SECRET_KEY);
-            res.json({ message: "Access granted", user: decoded });
-        } catch (err) {
-            res.status(401).json({ message: "Invalid token" });
-        }
-    } catch (error) {
-        console.error("Error:", error); // Log chi tiết lỗi
-        res.status(500).json({ message: error.message });
-    }
-};
