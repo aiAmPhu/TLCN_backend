@@ -18,6 +18,8 @@
         "crypto-js": "^4.2.0",
         "dotenv": "^16.4.7",
         "express": "^4.21.1",
+        "faker": "^6.6.6",
+        "fs": "^0.0.1-security",
         "ioredis": "^5.6.1",
         "jsonwebtoken": "^9.0.2",
         "mongoose": "^8.8.0",
