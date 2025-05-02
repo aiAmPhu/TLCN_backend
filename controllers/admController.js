@@ -1,4 +1,5 @@
 import AdmissionMajor from "../models/admissionMajor.js";
+import AdmissionBlock from "../models/admissionBlock.js";
 
 export const addAdMajor = async (req, res) => {
     try {
@@ -6,6 +7,18 @@ export const addAdMajor = async (req, res) => {
         const existingMajor = await AdmissionMajor.findOne({ where: { majorId } });
         if (existingMajor) {
             return res.status(400).json({ message: "Chuyên ngành đã tồn tại" });
+        }
+        // Lấy danh sách khối hợp lệ từ AdmissionBlock
+        const blocks = await AdmissionBlock.findAll({
+            attributes: ["admissionBlockId"],
+        });
+        const validBlocks = new Set(blocks.map((block) => block.admissionBlockId));
+        // Kiểm tra từng khối trong majorCombination
+        const invalidBlocks = majorCombination.filter((block) => !validBlocks.has(block));
+        if (invalidBlocks.length > 0) {
+            return res.status(400).json({
+                message: `Các khối sau không hợp lệ (không có trong bảng Blocks): ${invalidBlocks.join(", ")}.`,
+            });
         }
         const newMajor = new AdmissionMajor({
             majorId,
