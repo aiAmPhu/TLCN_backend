@@ -1,4 +1,6 @@
 import AdYear from "../models/admissionYear.js"; // Đổi tên model thành AdMajor
+import cron from "node-cron";
+import { Op } from "sequelize";
 
 export const addAdYear = async (req, res) => {
     try {
@@ -62,4 +64,33 @@ export const deleteAdYear = async (req, res) => {
         console.error("Lỗi khi xóa năm tuyển sinh:", error);
         res.status(500).json({ message: "Đã xảy ra lỗi khi xóa năm tuyển sinh." });
     }
+};
+
+// Hàm cập nhật trạng thái AdYear
+export const updateAdYearStatus = async () => {
+    try {
+        const currentDate = new Date();
+        const updatedRows = await AdYear.update(
+            { status: "inactive" },
+            {
+                where: {
+                    endDate: { [Op.lte]: currentDate }, // endDate <= ngày hiện tại
+                    status: { [Op.ne]: "inactive" }, // status chưa phải inactive
+                },
+            }
+        );
+        if (updatedRows[0] > 0) {
+            console.log(`Đã cập nhật ${updatedRows[0]} bản ghi AdYear thành inactive.`);
+        }
+    } catch (error) {
+        console.error("Lỗi khi cập nhật trạng thái AdYear:", error);
+    }
+};
+
+// Lên lịch chạy hàng ngày lúc 00:00
+export const scheduleAdYearStatusUpdate = () => {
+    cron.schedule("0 0 * * *", () => {
+        console.log("Chạy tác vụ cập nhật trạng thái AdYear...");
+        updateAdYearStatus();
+    });
 };
