@@ -1,21 +1,180 @@
 import AdmissionWishes from "../models/admissionWishes.js";
+import Transcripts from "../models/Transcript.js";
+import Scores from "../models/Score.js";
+import AdmissionBlocks from "../models/admissionBlock.js";
+import Subjects from "../models/Subject.js";
+import AdmissionRegions from "../models/admissionRegion.js";
+import AdmissionObjects from "../models/admissionObject.js";
+import LearningProcess from "../models/learningProcess.js";
 import AdmissionQuantity from "../models/admissionQuantity.js";
 import { Op } from "sequelize";
 
 export const addAdmissionWish = async (req, res) => {
+    // try {
+    //     const { criteriaId, admissionBlockId, majorId, uId, scores, status } = req.body;
+    //     const lastWish = await AdmissionWishes.findOne({
+    //         order: [["wishId", "DESC"]],
+    //         attributes: ["wishId"],
+    //     });
+    //     const newWishId = lastWish ? lastWish.wishId + 1 : 1;
+    //     const existingWishes = await AdmissionWishes.findAll({
+    //         where: { uId },
+    //         attributes: ["priority"],
+    //         order: [["priority", "DESC"]],
+    //     });
+    //     const priority = existingWishes.length === 0 ? 1 : existingWishes[0].priority + 1;
+    //     await AdmissionWishes.create({
+    //         wishId: newWishId,
+    //         priority,
+    //         criteriaId,
+    //         admissionBlockId,
+    //         majorId,
+    //         uId,
+    //         scores,
+    //         status,
+    //     });
+    //     res.status(201).json({
+    //         message: "Thêm nguyện vọng thành công.",
+    //     });
+    // } catch (error) {
+    //     if (error.name === "SequelizeUniqueConstraintError") {
+    //         return res.status(409).json({
+    //             message: "Nguyện vọng này đã tồn tại trong hệ thống.",
+    //         });
+    //     }
+    //     if (error instanceof Sequelize.ForeignKeyConstraintError) {
+    //         return res.status(422).json({
+    //             message: "Dữ liệu không hợp lệ: liên kết khóa ngoại không tồn tại .",
+    //         });
+    //     }
+    //     console.error("Lỗi khi thêm nguyện vọng:", error);
+    //     res.status(500).json({ message: "Đã xảy ra lỗi khi thêm nguyện vọng." });
+    // }
     try {
-        const { criteriaId, admissionBlockId, majorId, uId, scores, status } = req.body;
+        // 1. Lấy dữ liệu từ req.body
+        const { criteriaId, admissionBlockId, majorId, uId, status } = req.body;
+        // Kiểm tra các trường bắt buộc
+        if (!criteriaId || !admissionBlockId || !majorId || !uId) {
+            return res
+                .status(400)
+                .json({ message: "Thiếu các trường bắt buộc: criteriaId, admissionBlockId, majorId, uId." });
+        }
+        // 2. Tạo wishId mới
         const lastWish = await AdmissionWishes.findOne({
             order: [["wishId", "DESC"]],
             attributes: ["wishId"],
         });
         const newWishId = lastWish ? lastWish.wishId + 1 : 1;
+        // 3. Gán priority
         const existingWishes = await AdmissionWishes.findAll({
             where: { uId },
             attributes: ["priority"],
             order: [["priority", "DESC"]],
         });
         const priority = existingWishes.length === 0 ? 1 : existingWishes[0].priority + 1;
+        // 4. Lấy transcriptId từ Transcripts
+        const transcript = await Transcripts.findOne({
+            where: { userId: uId },
+            attributes: ["tId"],
+        });
+        if (!transcript) {
+            return res.status(404).json({ message: `Không tìm thấy transcript cho userId ${uId}.` });
+        }
+        const transcriptId = transcript.tId;
+        // 5. Lấy môn học từ AdmissionBlock
+        const block = await AdmissionBlocks.findOne({
+            where: { admissionBlockId },
+            attributes: ["admissionBlockSubject1", "admissionBlockSubject2", "admissionBlockSubject3"],
+        });
+        if (!block) {
+            return res.status(404).json({ message: `Không tìm thấy khối thi ${admissionBlockId}.` });
+        }
+        // Lấy danh sách môn học từ block
+        const subjects = [
+            block.admissionBlockSubject1,
+            block.admissionBlockSubject2,
+            block.admissionBlockSubject3,
+        ].filter((subject) => subject); // Loại bỏ null nếu có
+        // 6. Lấy suId từ Subject dựa trên tên môn
+        const subjectRecords = await Subjects.findAll({
+            where: { subject: { [Op.in]: subjects } },
+            attributes: ["suId", "subject"],
+        });
+        const subjectMap = new Map(subjectRecords.map((record) => [record.suId, record.subject]));
+        if (subjectRecords.length !== subjects.length) {
+            return res.status(400).json({ message: "Một hoặc nhiều môn học trong khối thi không tồn tại." });
+        }
+        const subjectIds = subjectRecords.map((record) => record.suId);
+        // 7. Lấy điểm từ Scores
+        const scores = await Scores.findAll({
+            where: {
+                transcriptId,
+                subjectId: { [Op.in]: subjectIds },
+            },
+            attributes: ["subjectId", "score1", "score2", "year"],
+        });
+        // console.log("Scores:", scores.length, "Subject IDs:", subjectIds.length);
+        const scoresBySubject = new Map();
+        scores.forEach((score) => {
+            if (!scoresBySubject.has(score.subjectId)) {
+                scoresBySubject.set(score.subjectId, []);
+            }
+            scoresBySubject.get(score.subjectId).push(score);
+        });
+        for (const suId of subjectIds) {
+            if (!scoresBySubject.has(suId) || scoresBySubject.get(suId).length === 0) {
+                return res.status(400).json({
+                    message: `Thiếu điểm cho môn ${subjectMap.get(suId)}.`,
+                });
+            }
+        }
+        // 8. Tính điểm trung bình môn
+        let totalSubjectScore = 0;
+        for (const suId of subjectIds) {
+            const subjectScores = scoresBySubject.get(suId);
+            const validScores = subjectScores
+                .flatMap((score) => [score.score1, score.score2])
+                .filter((score) => score !== null);
+            if (validScores.length === 0) {
+                return res.status(400).json({
+                    message: `Không có điểm hợp lệ cho môn ${subjectMap.get(suId)}.`,
+                });
+            }
+            const avgScore = validScores.reduce((sum, score) => sum + score, 0) / validScores.length;
+            totalSubjectScore += avgScore;
+        }
+        const avgSubjectScore = totalSubjectScore;
+        // 9. Lấy điểm cộng vùng và đối tượng từ learning_process
+        const learningProcess = await LearningProcess.findOne({
+            where: { userId: uId },
+            attributes: ["region", "priorityGroup"],
+        });
+        if (!learningProcess) {
+            return res
+                .status(404)
+                .json({ message: `Không tìm thấy thông tin vùng/ đối tượng ưu tiên cho userId ${uId}.` });
+        }
+        // Lấy điểm vùng
+        let regionScored = 0;
+        if (learningProcess.region) {
+            const region = await AdmissionRegions.findOne({
+                where: { regionId: learningProcess.region },
+                attributes: ["regionScored"],
+            });
+            regionScored = region ? region.regionScored : 0;
+        }
+        // Lấy điểm đối tượng ưu tiên
+        let objectScored = 0;
+        if (learningProcess.priorityGroup) {
+            const object = await AdmissionObjects.findOne({
+                where: { objectId: learningProcess.priorityGroup },
+                attributes: ["objectScored"],
+            });
+            objectScored = object ? object.objectScored : 0;
+        }
+        // 10. Tính điểm tổng
+        const totalScore = avgSubjectScore + regionScored + objectScored;
+        // 11. Tạo nguyện vọng mới
         await AdmissionWishes.create({
             wishId: newWishId,
             priority,
@@ -23,13 +182,17 @@ export const addAdmissionWish = async (req, res) => {
             admissionBlockId,
             majorId,
             uId,
-            scores,
+            scores: totalScore,
             status,
         });
+        // 12. Trả về kết quả
         res.status(201).json({
             message: "Thêm nguyện vọng thành công.",
+            wishId: newWishId,
+            scores: totalScore,
         });
     } catch (error) {
+        // Xử lý lỗi
         if (error.name === "SequelizeUniqueConstraintError") {
             return res.status(409).json({
                 message: "Nguyện vọng này đã tồn tại trong hệ thống.",
@@ -37,7 +200,7 @@ export const addAdmissionWish = async (req, res) => {
         }
         if (error instanceof Sequelize.ForeignKeyConstraintError) {
             return res.status(422).json({
-                message: "Dữ liệu không hợp lệ: liên kết khóa ngoại không tồn tại .",
+                message: "Dữ liệu không hợp lệ: liên kết khóa ngoại không tồn tại.",
             });
         }
         console.error("Lỗi khi thêm nguyện vọng:", error);

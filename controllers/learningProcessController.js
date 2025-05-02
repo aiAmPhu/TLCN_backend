@@ -1,4 +1,5 @@
 import LearningProcess from "../models/learningProcess.js";
+import { Sequelize } from "sequelize";
 
 export const addLearningProcess = async (req, res) => {
     try {
@@ -15,6 +16,7 @@ export const addLearningProcess = async (req, res) => {
             grade12_school,
             graduationYear,
             priorityGroup,
+            region,
             status,
             feedback,
         } = req.body;
@@ -35,6 +37,7 @@ export const addLearningProcess = async (req, res) => {
             grade12_school,
             graduationYear,
             priorityGroup,
+            region,
             status: status || "waiting",
             feedback,
         });
@@ -44,7 +47,7 @@ export const addLearningProcess = async (req, res) => {
     } catch (error) {
         if (error instanceof Sequelize.ForeignKeyConstraintError) {
             return res.status(422).json({
-                message: "Dữ liệu không hợp lệ: liên kết khóa ngoại không tồn tại (userId không tồn tại).",
+                message: "Dữ liệu không hợp lệ: liên kết khóa ngoại không tồn tại.",
             });
         }
         console.error("Lỗi khi thêm quá trình học tập:", error);

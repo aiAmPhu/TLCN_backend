@@ -2,7 +2,7 @@ import { DataTypes } from "sequelize";
 import sequelize from "../config/db.js";
 import User from "./user.js"; // Import model User
 import AdmissionObject from "./admissionObject.js"; // Import model AdmissionObject
-
+import AdmissionRegion from "./admissionRegion.js"; // Import model AdmissionRegion
 const LearningProcess = sequelize.define(
     "learning_process",
     {
@@ -22,7 +22,7 @@ const LearningProcess = sequelize.define(
         grade11_province: { type: DataTypes.STRING, allowNull: false },
         grade11_district: { type: DataTypes.STRING, allowNull: false },
         grade11_school: { type: DataTypes.STRING, allowNull: false },
-        grade10_province: { type: DataTypes.STRING, allowNull: false },
+        grade12_province: { type: DataTypes.STRING, allowNull: false },
         grade12_district: { type: DataTypes.STRING, allowNull: false },
         grade12_school: { type: DataTypes.STRING, allowNull: false },
         graduationYear: { type: DataTypes.STRING, allowNull: false },
@@ -34,7 +34,17 @@ const LearningProcess = sequelize.define(
                 key: "objectId",
             },
             onUpdate: "CASCADE", // Cập nhật tự động khi khóa chính thay đổi
-            onDelete: "SET DEFAULT", // Nếu `objectId` bị xóa thì đặt giá trị NULL
+            onDelete: "SET NULL", // Nếu `objectId` bị xóa thì đặt giá trị NULL
+        },
+        region: {
+            type: DataTypes.STRING,
+            allowNull: true,
+            references: {
+                model: AdmissionRegion,
+                key: "regionId",
+            },
+            onUpdate: "CASCADE",
+            onDelete: "SET NULL",
         },
         status: { type: DataTypes.STRING, allowNull: false },
         feedback: { type: DataTypes.STRING, allowNull: true },

@@ -7,12 +7,12 @@ export const addAdRegion = async (req, res) => {
         if (existingRegion) {
             return res.status(400).json({ message: "Region ID đã tồn tại." });
         }
-        const newRegion = await AdmissionRegion.create({
+        await AdmissionRegion.create({
             regionId,
             regionName,
             regionScored,
         });
-        res.status(201).json({ message: "Thêm khu vực thành công.", data: newRegion });
+        res.status(201).json({ message: "Thêm khu vực thành công." });
     } catch (error) {
         console.error("Lỗi khi thêm khu vực:", error);
         res.status(500).json({ message: "Lỗi khi thêm khu vực." });

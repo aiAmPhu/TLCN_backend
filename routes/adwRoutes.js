@@ -16,7 +16,7 @@ import { authenticate, authorizeRoles } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.post("/add", authenticate, authorizeRoles("user"), addAdmissionWish);
+router.post("/add", authenticate, authorizeRoles("user", "admin"), addAdmissionWish);
 // router.get("/max/:uId", getHighestPriorityAdmissionWishByUID);
 router.get("/getAll/:uId", authenticate, authorizeRoles("admin"), getAllWishesByUID);
 //router.get("/getUniqueEmails", getAllUniqueEmails);
