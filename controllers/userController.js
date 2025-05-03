@@ -130,6 +130,9 @@ export const sendOTP = async (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ message: "Email is required" });
     try {
+        if (!isValidEmail(email)) {
+            return res.status(400).json({ message: "Email không hợp lệ" });
+        }
         const existingUser = await User.findOne({ where: { email } });
         if (existingUser) {
             return res.status(400).json({ message: "Email đã được đăng ký!" });
@@ -163,7 +166,9 @@ export const verifyOTP = async (req, res) => {
     const { email, otp } = req.body;
     if (!email || !otp) return res.status(400).json({ message: "Thiếu email hoặc OTP" });
     const validOTP = otpStore[email];
-    if (!validOTP) return res.status(400).json({ message: "OTP đã hết hạn hoặc không tồn tại" });
+    if (typeof validOTP === "undefined") {
+        return res.status(400).json({ message: "OTP đã hết hạn hoặc không tồn tại" });
+    }
     if (parseInt(otp) !== validOTP) {
         return res.status(400).json({ message: "OTP không đúng" });
     }
