@@ -1,17 +1,27 @@
 import jwt from "jsonwebtoken";
+import dotenv from "dotenv";
+import { tokenBlacklist } from "../controllers/loginController.js";
+
+dotenv.config();
+const JWT_SECRET = process.env.JWT_SECRET;
+
 export const authenticate = (req, res, next) => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-        return res.status(401).json({ message: "Bạn cần đăng nhập để truy cập" });
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) {
+        return res.status(401).json({ message: "Không tìm thấy token" });
     }
-    const token = authHeader.split(" ")[1];
+    if (tokenBlacklist.has(token)) {
+        return res.status(401).json({ message: "Token đã bị vô hiệu hóa" });
+    }
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        req.user = decoded; // Giải mã thông tin user gán vào request
+        const decoded = jwt.verify(token, JWT_SECRET);
+        req.user = decoded;
         next();
-    } catch (error) {
-        console.error("Lỗi xác thực token:", error.message);
-        return res.status(401).json({ message: "Token không hợp lệ hoặc đã hết hạn" });
+    } catch (err) {
+        if (err.name === "TokenExpiredError") {
+            return res.status(401).json({ message: "Token đã hết hạn" });
+        }
+        return res.status(401).json({ message: "Token không hợp lệ" });
     }
 };
 
