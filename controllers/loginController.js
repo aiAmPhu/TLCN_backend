@@ -21,9 +21,13 @@ export const loginFunction = async (req, res) => {
         if (!isPasswordValid) {
             return res.status(401).json({ message: "Mật khẩu không chính xác" });
         }
-        const token = jwt.sign({ userId: user.userId, email: user.email, role: user.role }, JWT_SECRET, {
-            expiresIn: "24h",
-        });
+        const token = jwt.sign(
+            { userId: user.userId, email: user.email, role: user.role, name: user.name },
+            JWT_SECRET,
+            {
+                expiresIn: "24h",
+            }
+        );
         return res.status(200).json({
             message: "Đăng nhập thành công",
             token,
