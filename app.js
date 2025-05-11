@@ -16,6 +16,7 @@ import learningPRoutes from "./routes/learningPRoutes.js";
 import cors from "cors";
 import transcriptRoutes from "./routes/transcriptRoutes.js";
 import adwRoutes from "./routes/adwRoutes.js";
+import chatbotRoutes from "./routes/chatbotRoutes.js"
 
 dotenv.config();
 //connectDB();
@@ -38,5 +39,6 @@ app.use("/api/photo", photoRoutes);
 app.use("/api/jwt", jwtRoutes);
 app.use("/api/transcripts", transcriptRoutes);
 app.use("/api/wish", adwRoutes);
+app.use("/api/chatbot", chatbotRoutes)
 
 export default app;
