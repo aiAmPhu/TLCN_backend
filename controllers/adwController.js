@@ -10,46 +10,6 @@ import AdmissionQuantity from "../models/admissionQuantity.js";
 import { Op } from "sequelize";
 
 export const addAdmissionWish = async (req, res) => {
-    // try {
-    //     const { criteriaId, admissionBlockId, majorId, uId, scores, status } = req.body;
-    //     const lastWish = await AdmissionWishes.findOne({
-    //         order: [["wishId", "DESC"]],
-    //         attributes: ["wishId"],
-    //     });
-    //     const newWishId = lastWish ? lastWish.wishId + 1 : 1;
-    //     const existingWishes = await AdmissionWishes.findAll({
-    //         where: { uId },
-    //         attributes: ["priority"],
-    //         order: [["priority", "DESC"]],
-    //     });
-    //     const priority = existingWishes.length === 0 ? 1 : existingWishes[0].priority + 1;
-    //     await AdmissionWishes.create({
-    //         wishId: newWishId,
-    //         priority,
-    //         criteriaId,
-    //         admissionBlockId,
-    //         majorId,
-    //         uId,
-    //         scores,
-    //         status,
-    //     });
-    //     res.status(201).json({
-    //         message: "Thêm nguyện vọng thành công.",
-    //     });
-    // } catch (error) {
-    //     if (error.name === "SequelizeUniqueConstraintError") {
-    //         return res.status(409).json({
-    //             message: "Nguyện vọng này đã tồn tại trong hệ thống.",
-    //         });
-    //     }
-    //     if (error instanceof Sequelize.ForeignKeyConstraintError) {
-    //         return res.status(422).json({
-    //             message: "Dữ liệu không hợp lệ: liên kết khóa ngoại không tồn tại .",
-    //         });
-    //     }
-    //     console.error("Lỗi khi thêm nguyện vọng:", error);
-    //     res.status(500).json({ message: "Đã xảy ra lỗi khi thêm nguyện vọng." });
-    // }
     try {
         // 1. Lấy dữ liệu từ req.body
         const { criteriaId, admissionBlockId, majorId, uId, status } = req.body;

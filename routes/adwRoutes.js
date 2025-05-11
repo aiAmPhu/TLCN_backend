@@ -18,7 +18,7 @@ const router = express.Router();
 
 router.post("/add", authenticate, authorizeRoles("user", "admin"), addAdmissionWish);
 // router.get("/max/:uId", getHighestPriorityAdmissionWishByUID);
-router.get("/getAll/:uId", authenticate, authorizeRoles("admin"), getAllWishesByUID);
+router.get("/getAll/:uId", authenticate, authorizeRoles("user"), getAllWishesByUID);
 //router.get("/getUniqueEmails", getAllUniqueEmails);
 router.get("/getByStatus/:status", authenticate, authorizeRoles("admin"), getWishesByStatus);
 router.put("/accept/:id", authenticate, authorizeRoles("admin"), acceptWish);
