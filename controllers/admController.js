@@ -48,6 +48,22 @@ export const getAllAdMajors = async (req, res) => {
     }
 };
 
+export const getMajorByID = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const major = await AdmissionMajor.findOne({
+            where: { majorId: id },
+        });
+        if (!major) {
+            return res.status(404).json({ message: "Không tìm thấy ngành tuyển sinh này." });
+        }
+        res.status(200).json(major);
+    } catch (error) {
+        console.error("Lỗi khi lấy thông tin ngành tuyển sinh:", error);
+        res.status(500).json({ message: "Đã xảy ra lỗi khi lấy thông tin ngành tuyển sinh." });
+    }
+};
+
 export const getMajorCombinationByID = async (req, res) => {
     try {
         const { id } = req.params;
