@@ -81,6 +81,21 @@ export const getAllUsers = async (req, res) => {
     }
 };
 
+export const getUserByID = async (req, res) => {
+    const { uId } = req.params;
+    try {
+        const user = await User.findOne({ where: { userId: uId } });
+
+        if (!user) {
+            return res.status(404).json({ message: "Không tìm thấy người dùng." });
+        }
+        res.status(200).json({ message: "Lấy thông tin người dùng thành công", data: user });
+    } catch (error) {
+        console.error("Lỗi khi lấy thông tin người dùng:", error.message);
+        res.status(500).json({ message: "Đã xảy ra lỗi khi truy vấn người dùng." });
+    }
+};
+
 export const updateUser = async (req, res) => {
     const { userId } = req.params;
     const { name, email, password, role, pic } = req.body;
@@ -108,6 +123,34 @@ export const updateUser = async (req, res) => {
     } catch (error) {
         console.error("Lỗi khi cập nhật người dùng:", error.message);
         res.status(500).json({ message: "Cập nhật người dùng thất bại" });
+    }
+};
+
+export const changePassword = async (req, res) => {
+    try {
+        const { oldPassword, newPassword } = req.body;
+        const { userId } = req.params;
+        // 1. Kiểm tra user có tồn tại không
+        const user = await User.findOne({ where: { userId } });
+        if (!user) {
+            return res.status(404).json({ message: "Người dùng không tồn tại" });
+        }
+        // 2. So sánh mật khẩu cũ
+        const isMatch = await bcrypt.compare(oldPassword, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ message: "Mật khẩu cũ không chính xác" });
+        }
+        if (newPassword && !isValidPassword(newPassword)) {
+            return res.status(400).json({ message: "Mật khẩu phải có ít nhất 8 ký tự, chỉ gồm chữ cái và số" });
+        }
+        // 3. Mã hóa mật khẩu mới và cập nhật
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        user.password = hashedPassword;
+        await user.save();
+        return res.status(200).json({ message: "Đổi mật khẩu thành công" });
+    } catch (error) {
+        console.error("Lỗi khi đổi mật khẩu:", error.message);
+        return res.status(500).json({ message: "Đã xảy ra lỗi khi đổi mật khẩu" });
     }
 };
 

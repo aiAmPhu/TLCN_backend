@@ -15,7 +15,6 @@ const syncDB = async () => {
         // await updateAdYearStatus();
         // console.log("✅ Completed initial AdYear status update");
         scheduleAdYearStatusUpdate();
-        console.log("✅ Scheduled AdYear status update cron job");
         app.listen(PORT, () => {
             console.log(`🚀 Server running on port ${PORT}`);
         });

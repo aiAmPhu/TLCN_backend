@@ -19,7 +19,7 @@ router.put("/accept/:id", authenticate, authorizeRoles("reviewer"), acceptAdInfo
 router.put("/reject/:id", authenticate, authorizeRoles("reviewer"), rejectAdInformation);
 router.get("/getall", authenticate, authorizeRoles("reviewer"), getAllAdInformation);
 router.get("/getStatus/:id", authenticate, authorizeRoles("reviewer"), getAdmissionInformationStatusByID);
-router.get("/getAdi/:id", authenticate, authorizeRoles("reviewer"), getAdmissionInformationByID);
+router.get("/getAdi/:id", authenticate, authorizeRoles("reviewer", "user"), getAdmissionInformationByID);
 router.get("/getFaLName/:id", authenticate, authorizeRoles("reviewer", "user"), getFirstAndLastNameByID);
 
 export default router;
