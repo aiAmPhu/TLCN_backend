@@ -33,6 +33,20 @@ export const getAllAdObjects = async (req, res) => {
     }
 };
 
+export const getObjectNameByID = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const object = await AdmissionObject.findOne({ where: { objectId: id } });
+        if (!object) {
+            return res.status(404).json({ message: "Không tìm thấy đối tượng ưu tiên." });
+        }
+        res.status(200).json(object.objectName);
+    } catch (error) {
+        console.error("Lỗi khi lấy đối tượng ưu tiên theo ID:", error);
+        res.status(500).json({ message: "Đã xảy ra lỗi khi lấy đối tượng ưu tiên." });
+    }
+};
+
 export const getScoreByID = async (req, res) => {
     try {
         const { id } = req.params;

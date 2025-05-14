@@ -55,5 +55,13 @@ const LearningProcess = sequelize.define(
 );
 
 LearningProcess.belongsTo(User, { foreignKey: "userId" });
-LearningProcess.belongsTo(AdmissionObject, { foreignKey: "priorityGroup" });
+LearningProcess.belongsTo(AdmissionObject, {
+    foreignKey: "priorityGroup",
+    targetKey: "objectId",
+});
+
+LearningProcess.belongsTo(AdmissionRegion, {
+    foreignKey: "region",
+    targetKey: "regionId",
+});
 export default LearningProcess;

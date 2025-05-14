@@ -12,7 +12,7 @@ import { authenticate, authorizeRoles } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.post("/add", authenticate, authorizeRoles("user"), addPhotoID);
+router.post("/add", authenticate, authorizeRoles("user", "reviewer"), addPhotoID);
 router.put("/update/:userId", authenticate, authorizeRoles("user"), updatePhotoID);
 router.get("/getall", authenticate, authorizeRoles("reviewer"), getAllPhotos);
 router.put("/accept/:userId", authenticate, authorizeRoles("reviewer"), acceptPhotoID);

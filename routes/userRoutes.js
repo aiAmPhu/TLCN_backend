@@ -16,7 +16,7 @@ const router = express.Router();
 
 router.post("/add", addUser);
 // router.post("/addNoOTP", addUserNoOTP);
-router.get("/getall", authenticate, authorizeRoles("admin", "user"), getAllUsers);
+router.get("/getall", authenticate, authorizeRoles("admin", "reviewer"), getAllUsers);
 router.get("/getUserByID/:uId", authenticate, authorizeRoles("admin", "user"), getUserByID);
 router.put("/update/:userId", authenticate, authorizeRoles("user", "admin"), updateUser);
 router.put("/changePassword/:userId", authenticate, authorizeRoles("user", "admin"), changePassword);

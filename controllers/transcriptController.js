@@ -217,7 +217,6 @@ export const getAllTranscripts = async (req, res) => {
 
 export const getTranscriptByUserId = async (req, res) => {
     const { userId } = req.params;
-
     try {
         const transcript = await Transcript.findOne({
             where: { userId },
@@ -227,6 +226,13 @@ export const getTranscriptByUserId = async (req, res) => {
                     model: Score,
                     as: "scores",
                     attributes: ["subjectID", "year", "score1", "score2"],
+                    include: [
+                        {
+                            model: Subject,
+                            as: "subject",
+                            attributes: ["subject"],
+                        },
+                    ],
                 },
             ],
         });
@@ -234,8 +240,15 @@ export const getTranscriptByUserId = async (req, res) => {
         if (!transcript) {
             return res.status(404).json({ message: "Không tìm thấy học bạ cho người dùng này." });
         }
+        const plainTranscript = transcript.toJSON();
+        plainTranscript.scores = plainTranscript.scores.map((score) => ({
+            year: score.year,
+            subject: score.subject?.subject || "Không rõ môn",
+            score1: score.score1,
+            score2: score.score2,
+        }));
 
-        res.status(200).json({ message: "Lấy học bạ thành công", data: transcript });
+        res.status(200).json({ message: "Lấy học bạ thành công", data: plainTranscript });
     } catch (error) {
         console.error("Lỗi khi lấy học bạ theo userId:", error);
         res.status(500).json({ message: "Có lỗi xảy ra", error: error.message });

@@ -1,3 +1,5 @@
+import AdmissionRegion from "../models/admissionRegion.js";
+import AdmissionObject from "../models/admissionObject.js";
 import LearningProcess from "../models/learningProcess.js";
 import { Sequelize } from "sequelize";
 
@@ -191,13 +193,31 @@ export const getLearningProcessByUID = async (req, res) => {
         }
         const learningProcess = await LearningProcess.findOne({
             where: { userId },
+            include: [
+                {
+                    model: AdmissionObject,
+                    attributes: ["objectName"], // hoặc chỉ 'name' nếu không cần id
+                },
+                {
+                    model: AdmissionRegion,
+                    attributes: ["regionName"],
+                },
+            ],
         });
         if (!learningProcess) {
             return res.status(404).json({ message: "Không tìm thấy dữ liệu cho userId này." });
         }
+        // Format dữ liệu trả về
+        const jsonData = learningProcess.toJSON();
+        // Gán lại priorityGroup và region thành name tương ứng
+        jsonData.priorityGroup = jsonData.admission_object?.objectName || jsonData.priorityGroup;
+        jsonData.region = jsonData.AdmissionRegion?.regionName || jsonData.region;
+        // Xoá các trường không cần
+        delete jsonData.admission_object;
+        delete jsonData.AdmissionRegion;
         res.status(200).json({
             message: "Lấy dữ liệu thành công!",
-            data: learningProcess,
+            data: jsonData,
         });
     } catch (error) {
         console.error("Lỗi khi lấy thông tin quá trình học tập:", error);
