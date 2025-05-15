@@ -1,4 +1,5 @@
 import User from "../models/user.js";
+import AdmissionInformation from "../models/admissionInfomation.js";
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
 import bcrypt from "bcrypt";
@@ -38,6 +39,10 @@ export const addUser = async (req, res) => {
             password: hashedPassword,
             role,
             pic,
+        });
+        await AdmissionInformation.create({
+            userId: newUser.userId,
+            email: newUser.email,
         });
         res.status(201).json({ message: "Tạo người dùng thành công", user: newUser });
     } catch (error) {

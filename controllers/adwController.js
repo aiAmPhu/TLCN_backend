@@ -197,9 +197,6 @@ export const getAllWishesByUID = async (req, res) => {
             attributes: ["wishId", "priority", "criteriaId", "admissionBlockId", "majorId", "scores", "status"],
             order: [["priority", "ASC"]],
         });
-        if (wishes.length === 0) {
-            return res.status(404).json({ message: "Không tìm thấy nguyện vọng nào cho người dùng này." });
-        }
         res.status(200).json({
             message: "Lấy danh sách nguyện vọng thành công.",
             wishes,
