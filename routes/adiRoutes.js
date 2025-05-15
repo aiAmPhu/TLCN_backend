@@ -8,6 +8,7 @@ import {
     acceptAdInformation,
     rejectAdInformation,
     getFirstAndLastNameByID,
+    getBasicAdmissionInfo,
 } from "../controllers/adiController.js";
 import { authenticate, authorizeRoles } from "../middleware/authMiddleware.js";
 
@@ -21,5 +22,5 @@ router.get("/getall", authenticate, authorizeRoles("reviewer"), getAllAdInformat
 router.get("/getStatus/:id", authenticate, authorizeRoles("reviewer"), getAdmissionInformationStatusByID);
 router.get("/getAdi/:id", authenticate, authorizeRoles("reviewer", "user"), getAdmissionInformationByID);
 router.get("/getFaLName/:id", authenticate, authorizeRoles("reviewer", "user"), getFirstAndLastNameByID);
-
+router.get("/getBasicInfo/:userId", authenticate, authorizeRoles("user"), getBasicAdmissionInfo);
 export default router;

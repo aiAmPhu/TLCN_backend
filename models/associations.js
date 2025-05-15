@@ -2,7 +2,8 @@ import Transcript from "./Transcript.js";
 import Score from "./Score.js";
 import User from "./user.js";
 import Subject from "./Subject.js";
-
+import AdmissionInformation from "./admissionInfomation.js";
+import Photo from "./photoID.js";
 // Quan hệ
 Transcript.hasMany(Score, {
     foreignKey: "transcriptId",
@@ -29,5 +30,8 @@ Score.belongsTo(Subject, {
     targetKey: "suId", // key trong bảng Subject
     as: "subject", // tên alias dùng trong include
 });
+
+AdmissionInformation.hasOne(Photo, { foreignKey: "userId", as: "Photo" });
+Photo.belongsTo(AdmissionInformation, { foreignKey: "userId" });
 
 export { Transcript, Score, User };

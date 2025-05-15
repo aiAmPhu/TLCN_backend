@@ -1,4 +1,7 @@
 import AdmissionInformation from "../models/admissionInfomation.js";
+import PhotoID from "../models/photoID.js";
+import Transcript from "../models/Transcript.js";
+import LearningProcess from "../models/learningProcess.js";
 import { Sequelize } from "sequelize";
 
 export const addAdInformation = async (req, res) => {
@@ -170,5 +173,80 @@ export const getFirstAndLastNameByID = async (req, res) => {
     } catch (error) {
         console.error("Lỗi khi lấy họ và tên thí sinh:", error);
         res.status(500).json({ message: "Đã xảy ra lỗi khi lấy họ và tên thí sinh." });
+    }
+};
+
+export const getBasicAdmissionInfo = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        if (!userId) {
+            return res.status(400).json({ message: "Thiếu userId trong yêu cầu." });
+        }
+        const info = await AdmissionInformation.findOne({
+            where: { userId },
+            attributes: [
+                "firstName",
+                "lastName",
+                "birthDate",
+                "email",
+                "gender",
+                "phone",
+                "idNumber",
+                "status",
+                "feedback",
+            ],
+            include: [
+                {
+                    model: PhotoID,
+                    as: "Photo",
+                    attributes: ["personalPic", "status", "feedback"],
+                },
+            ],
+        });
+        if (!info) {
+            return res.status(404).json({ message: "Không tìm thấy thông tin." });
+        }
+        const [transcript, learning] = await Promise.all([
+            Transcript.findOne({ where: { userId }, attributes: ["status", "feedback"] }),
+            LearningProcess.findOne({ where: { userId }, attributes: ["status", "feedback"] }),
+        ]);
+        // Chuyển về dạng plain object
+        const plain = info.toJSON();
+        const parts = [
+            { name: "Thông tin cá nhân", status: plain.status, feedback: plain.feedback },
+            { name: "Ảnh", status: plain.Photo?.status, feedback: plain.Photo?.feedback },
+            { name: "Học bạ", status: transcript?.status, feedback: transcript?.feedback },
+            { name: "Quá trình học tập", status: learning?.status, feedback: learning?.feedback },
+        ];
+        const statusList = parts.map((p) => p.status);
+        let unifiedStatus;
+        if (statusList.every((s) => s === "accepted")) {
+            unifiedStatus = "accepted";
+        } else if (statusList.includes("rejected")) {
+            unifiedStatus = "rejected";
+        } else if (statusList.includes("waiting")) {
+            unifiedStatus = "waiting";
+        }
+        const feedbackSummary =
+            parts
+                .filter((p) => p.status === "rejected" && typeof p.feedback === "string" && p.feedback.trim() !== "")
+                .map((p) => `-${p.name}: ${p.feedback.trim()}`)
+                .join("\n") || null;
+        // Format data: nếu không có thì gán "Chưa cập nhật"
+        const result = {
+            fullName: `${plain.firstName} ${plain.lastName}` || "Chưa cập nhật",
+            birthDate: plain.birthDate || "Chưa cập nhật",
+            email: plain.email || "Chưa cập nhật",
+            gender: plain.gender || "Chưa cập nhật",
+            phoneNumber: plain.phone || "Chưa cập nhật",
+            idNumber: plain.idNumber || "Chưa cập nhật",
+            pic: plain.Photo?.personalPic || null,
+            status: unifiedStatus,
+            feedbackSummary: feedbackSummary || null,
+        };
+        res.status(200).json({ message: "Lấy thông tin thành công!", data: result });
+    } catch (error) {
+        console.error("Lỗi khi lấy thông tin cơ bản:", error);
+        res.status(500).json({ message: "Đã xảy ra lỗi khi truy vấn dữ liệu." });
     }
 };
