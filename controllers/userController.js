@@ -1,5 +1,8 @@
 import User from "../models/user.js";
 import AdmissionInformation from "../models/admissionInfomation.js";
+import LearningProcess from "../models/learningProcess.js";
+import PhotoID from "../models/photoID.js";
+import Transcript from "../models/Transcript.js";
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
 import bcrypt from "bcrypt";
@@ -43,6 +46,15 @@ export const addUser = async (req, res) => {
         await AdmissionInformation.create({
             userId: newUser.userId,
             email: newUser.email,
+        });
+        await LearningProcess.create({
+            userId: newUser.userId,
+        });
+        await PhotoID.create({
+            userId: newUser.userId,
+        });
+        await Transcript.create({
+            userId: newUser.userId,
         });
         res.status(201).json({ message: "Tạo người dùng thành công", user: newUser });
     } catch (error) {

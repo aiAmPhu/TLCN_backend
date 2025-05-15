@@ -21,7 +21,7 @@ const Transcript = sequelize.define(
         },
         status: {
             type: DataTypes.STRING,
-            allowNull: false,
+            allowNull: true,
         },
         feedback: {
             type: DataTypes.STRING,
