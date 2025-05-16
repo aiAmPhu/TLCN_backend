@@ -12,8 +12,8 @@ const router = express.Router();
 
 router.post("/add", authenticate, authorizeRoles("admin"), addAdQuantity);
 router.get("/getall", authenticate, authorizeRoles("admin"), getAllAdQuantities);
-router.put("/update/:id", authenticate, authorizeRoles("admin"), updateAdQuantity);
-router.delete("/delete/:id", authenticate, authorizeRoles("admin"), deleteAdQuantity);
+router.put("/update", authenticate, authorizeRoles("admin"), updateAdQuantity);
+router.delete("/delete", authenticate, authorizeRoles("admin"), deleteAdQuantity);
 router.get(
     "/getQuantityByCriteriaIdAndMajorId/:criteriaId/:majorId",
     authenticate,
