@@ -53,8 +53,13 @@ export const addUser = async (req, res) => {
         await PhotoID.create({
             userId: newUser.userId,
         });
+        const lastTranscript = await Transcript.findOne({
+            order: [["tId", "DESC"]],
+        });
+        const newTranscriptId = lastTranscript ? lastTranscript.tId + 1 : 1;
         await Transcript.create({
             userId: newUser.userId,
+            tId: newTranscriptId,
         });
         res.status(201).json({ message: "Tạo người dùng thành công", user: newUser });
     } catch (error) {
