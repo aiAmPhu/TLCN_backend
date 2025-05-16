@@ -72,14 +72,48 @@ export const getAllAdQuantities = async (req, res) => {
 
 export const updateAdQuantity = async (req, res) => {
     try {
-        const { id } = req.params;
-        const { quantity } = req.body;
-        const existingRecord = await AdmissionQuantity.findByPk(id);
+        const { oldMajorId, oldCriteriaId, newMajorId, newCriteriaId, quantity } = req.body;
+        
+        // Kiểm tra record cũ có tồn tại không
+        const existingRecord = await AdmissionQuantity.findOne({
+            where: { 
+                majorId: oldMajorId,
+                criteriaId: oldCriteriaId
+            }
+        });
+
         if (!existingRecord) {
             return res.status(404).json({ message: "Không tìm thấy chỉ tiêu phù hợp." });
         }
-        await existingRecord.update({ quantity });
-        res.status(200).json({ message: "Cập nhật thành công!", updatedData: existingRecord });
+
+        // Kiểm tra nếu có thay đổi majorId hoặc criteriaId
+        if (oldMajorId !== newMajorId || oldCriteriaId !== newCriteriaId) {
+            // Kiểm tra xem cặp mới đã tồn tại chưa
+            const duplicateCheck = await AdmissionQuantity.findOne({
+                where: {
+                    majorId: newMajorId,
+                    criteriaId: newCriteriaId
+                }
+            });
+
+            if (duplicateCheck) {
+                return res.status(409).json({
+                    message: "Chỉ tiêu cho ngành và diện xét tuyển này đã tồn tại."
+                });
+            }
+        }
+
+        // Cập nhật record
+        await existingRecord.update({
+            majorId: newMajorId,
+            criteriaId: newCriteriaId,
+            quantity: quantity
+        });
+
+        res.status(200).json({ 
+            message: "Cập nhật thành công!", 
+            updatedData: existingRecord 
+        });
     } catch (error) {
         if (error.name === "SequelizeUniqueConstraintError") {
             return res.status(409).json({
@@ -88,7 +122,7 @@ export const updateAdQuantity = async (req, res) => {
         }
         if (error instanceof Sequelize.ForeignKeyConstraintError) {
             return res.status(422).json({
-                message: "Dữ liệu không hợp lệ: liên kết khóa ngoại không tồn tại .",
+                message: "Dữ liệu không hợp lệ: liên kết khóa ngoại không tồn tại.",
             });
         }
         console.error("Lỗi khi cập nhật AdmissionQuantity:", error);
@@ -98,12 +132,26 @@ export const updateAdQuantity = async (req, res) => {
 
 export const deleteAdQuantity = async (req, res) => {
     try {
-        const { id } = req.params;
-        const existingRecord = await AdmissionQuantity.findOne({ where: { aqId: id } });
+        const { majorId, criteriaId } = req.body;
+        
+        const existingRecord = await AdmissionQuantity.findOne({ 
+            where: { 
+                majorId: majorId,
+                criteriaId: criteriaId
+            } 
+        });
+
         if (!existingRecord) {
             return res.status(404).json({ message: "Không tìm thấy chỉ tiêu cần xóa." });
         }
-        await AdmissionQuantity.destroy({ where: { aqId: id } });
+
+        await AdmissionQuantity.destroy({ 
+            where: { 
+                majorId: majorId,
+                criteriaId: criteriaId
+            } 
+        });
+
         res.status(200).json({ message: "Xóa chỉ tiêu thành công." });
     } catch (error) {
         console.error("Lỗi khi xóa dữ liệu:", error);
