@@ -74,6 +74,10 @@ export const updateAdInformation = async (req, res) => {
         if (!existingInfo) {
             return res.status(404).json({ message: "Không tìm thấy thông tin tuyển sinh!" });
         }
+        // Validate status if provided
+        if (updateData.status && !["waiting", "accepted", "rejected"].includes(updateData.status)) {
+            return res.status(400).json({ message: "Trạng thái không hợp lệ!" });
+        }
         updateData.status = "waiting";
         updateData.feedback = "";
         await existingInfo.update(updateData);
