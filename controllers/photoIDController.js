@@ -2,7 +2,7 @@ import PhotoID from "../models/photoID.js";
 
 export const addPhotoID = async (req, res) => {
     try {
-        const { userId, personalPic, frontCCCD, backCCCD, grade10Pic, grade11Pic, grade12Pic } = req.body;
+        const { userId, personalPic, birthCertificate, frontCCCD, backCCCD, grade10Pic, grade11Pic, grade12Pic } = req.body;
         const existingPhoto = await PhotoID.findOne({ where: { userId } });
         if (existingPhoto) {
             return res.status(400).json({ message: "User đã tồn tại." });
@@ -10,6 +10,7 @@ export const addPhotoID = async (req, res) => {
         await PhotoID.create({
             userId,
             personalPic,
+            birthCertificate,
             frontCCCD,
             backCCCD,
             grade10Pic,

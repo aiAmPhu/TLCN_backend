@@ -17,6 +17,7 @@ const PhotoID = sequelize.define(
             onUpdate: "CASCADE",
         },
         personalPic: { type: DataTypes.STRING, allowNull: true },
+        birthCertificate: { type: DataTypes.STRING, allowNull: true },
         frontCCCD: { type: DataTypes.STRING, allowNull: true },
         backCCCD: { type: DataTypes.STRING, allowNull: true },
         grade10Pic: { type: DataTypes.STRING, allowNull: true },
