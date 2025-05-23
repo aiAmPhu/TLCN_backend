@@ -1,102 +1,67 @@
 import AdmissionBlock from "../models/admissionBlock.js";
+import * as admissionBlockService from "../services/admissionBlockService.js";
 
 export const addAdBlock = async (req, res) => {
     try {
-        const {
-            admissionBlockId,
-            admissionBlockName,
-            admissionBlockSubject1,
-            admissionBlockSubject2,
-            admissionBlockSubject3,
-        } = req.body;
-        const existingAdBlock = await AdmissionBlock.findOne({ where: { admissionBlockId } });
-        if (existingAdBlock) {
-            return res.status(400).json({ message: "Khối tuyển sinh đã tồn tại" });
-        }
-        await AdmissionBlock.create({
-            admissionBlockId,
-            admissionBlockName,
-            admissionBlockSubject1,
-            admissionBlockSubject2,
-            admissionBlockSubject3,
-        });
-        res.status(201).json({ message: "Tạo khối tuyển sinh thành công" });
+        const message = await admissionBlockService.addAdmissionBlock(req.body);
+        res.status(201).json({ message });
     } catch (error) {
-        console.error("Lỗi khi thêm khối tuyển sinh:", error);
-        res.status(500).json({ message: "Lỗi phát sinh trong quá trình thêm: ", error: error.message });
+        console.error("Lỗi khi thêm khối tuyển sinh:", error.message);
+        const statusCode = error.statusCode || 500;
+        res.status(statusCode).json({ message: error.message || "Lỗi phát sinh trong quá trình thêm khối tuyển sinh" });
     }
 };
 
 export const getAllAdBlocks = async (req, res) => {
     try {
-        const adBlocks = await AdmissionBlock.findAll();
-        if (!adBlocks || adBlocks.length === 0) {
-            return res.status(404).json({ message: "Không tìm được khối tuyển sinh" });
-        }
+        const adBlocks = await admissionBlockService.getAllAdmissionBlocks();
         res.status(200).json(adBlocks);
     } catch (error) {
-        console.error("Lỗi khi lấy danh sách khối tuyển sinh: ", error);
-        res.status(500).json({ message: "Lỗi phát sinh trong quá trình thêm: ", error: error.message });
+        console.error("Lỗi khi lấy danh sách khối tuyển sinh:", error.message);
+        const statusCode = error.statusCode || 500;
+        res.status(statusCode).json({ message: error.message || "Lỗi phát sinh trong quá trình lấy dữ liệu" });
     }
 };
 
 export const getAllSubjectsByAdmissionBlockId = async (req, res) => {
     try {
         const { admissionBlockId } = req.params;
-        const adBlock = await AdmissionBlock.findOne({
-            where: { admissionBlockId },
-        });
-        if (!adBlock) {
-            return res.status(404).json({ message: "Không tìm thấy khối tuyển sinh" });
-        }
-        const subjects = [
-            adBlock.admissionBlockSubject1,
-            adBlock.admissionBlockSubject2,
-            adBlock.admissionBlockSubject3,
-        ].filter((subject) => subject !== null); // Lọc bỏ giá trị null
+        const subjects = await admissionBlockService.getSubjectsByAdmissionBlockId(admissionBlockId);
         res.status(200).json({ subjects });
     } catch (error) {
-        console.error("Lỗi khi lấy danh sách môn học:", error);
-        res.status(500).json({ message: "Lỗi phát sinh trong quá trình lấy môn học: ", error: error.message });
+        console.error("Lỗi khi lấy danh sách môn học:", error.message);
+        const statusCode = error.statusCode || 500;
+        res.status(statusCode).json({
+            message: error.message || "Lỗi phát sinh trong quá trình lấy môn học",
+        });
     }
 };
 
 export const updateAdBlock = async (req, res) => {
     try {
         const { id } = req.params;
-        const { admissionBlockName, admissionBlockSubject1, admissionBlockSubject2, admissionBlockSubject3 } = req.body;
-        const adBlock = await AdmissionBlock.findOne({ where: { admissionBlockId: id } });
-        if (!adBlock) {
-            return res.status(404).json({ message: "Khối xét tuyển không tồn tại." });
-        }
-        await AdmissionBlock.update(
-            {
-                admissionBlockName,
-                admissionBlockSubject1,
-                admissionBlockSubject2,
-                admissionBlockSubject3,
-            },
-            { where: { admissionBlockId: id } }
-        );
-        res.status(200).json({ message: "Cập nhật khối xét tuyển thành công." });
+        const message = await admissionBlockService.updateAdmissionBlock(id, req.body);
+        res.status(200).json({ message });
     } catch (error) {
-        console.error("Lỗi khi cập nhật khối xét tuyển:", error);
-        res.status(500).json({ message: "Lỗi server khi cập nhật khối xét tuyển." });
+        console.error("Lỗi khi cập nhật khối xét tuyển:", error.message);
+        const statusCode = error.statusCode || 500;
+        res.status(statusCode).json({
+            message: error.message || "Lỗi server khi cập nhật khối xét tuyển.",
+        });
     }
 };
 
 export const deleteAdBlock = async (req, res) => {
     try {
         const { id } = req.params;
-        const adBlock = await AdmissionBlock.findOne({ where: { admissionBlockId: id } });
-        if (!adBlock) {
-            return res.status(404).json({ message: "Khối xét tuyển không tồn tại." });
-        }
-        await AdmissionBlock.destroy({ where: { admissionBlockId: id } });
-        res.status(200).json({ message: "Xóa khối xét tuyển thành công." });
+        const message = await admissionBlockService.deleteAdmissionBlock(id);
+        res.status(200).json({ message });
     } catch (error) {
-        console.error("Lỗi khi xóa khối xét tuyển:", error);
-        res.status(500).json({ message: "Lỗi server khi xóa khối xét tuyển." });
+        console.error("Lỗi khi xóa khối xét tuyển:", error.message);
+        const statusCode = error.statusCode || 500;
+        res.status(statusCode).json({
+            message: error.message || "Lỗi server khi xóa khối xét tuyển.",
+        });
     }
 };
 
@@ -106,14 +71,14 @@ export const exportAdBlocks = async (req, res) => {
         if (!adBlocks || adBlocks.length === 0) {
             return res.status(404).json({ message: "Không có dữ liệu khối tuyển sinh để xuất" });
         }
-        
+
         // Format data for export
-        const exportData = adBlocks.map(block => ({
+        const exportData = adBlocks.map((block) => ({
             admissionBlockId: block.admissionBlockId,
             admissionBlockName: block.admissionBlockName,
             admissionBlockSubject1: block.admissionBlockSubject1,
             admissionBlockSubject2: block.admissionBlockSubject2,
-            admissionBlockSubject3: block.admissionBlockSubject3
+            admissionBlockSubject3: block.admissionBlockSubject3,
         }));
 
         res.status(200).json(exportData);
@@ -126,20 +91,20 @@ export const exportAdBlocks = async (req, res) => {
 export const importAdBlocks = async (req, res) => {
     try {
         const { adBlocks } = req.body;
-        
+
         if (!Array.isArray(adBlocks)) {
             return res.status(400).json({ message: "Dữ liệu không hợp lệ" });
         }
 
         const results = {
             success: [],
-            errors: []
+            errors: [],
         };
 
         for (const block of adBlocks) {
             try {
-                const existingBlock = await AdmissionBlock.findOne({ 
-                    where: { admissionBlockId: block.admissionBlockId } 
+                const existingBlock = await AdmissionBlock.findOne({
+                    where: { admissionBlockId: block.admissionBlockId },
                 });
 
                 if (existingBlock) {
@@ -149,7 +114,7 @@ export const importAdBlocks = async (req, res) => {
                             admissionBlockName: block.admissionBlockName,
                             admissionBlockSubject1: block.admissionBlockSubject1,
                             admissionBlockSubject2: block.admissionBlockSubject2,
-                            admissionBlockSubject3: block.admissionBlockSubject3
+                            admissionBlockSubject3: block.admissionBlockSubject3,
                         },
                         { where: { admissionBlockId: block.admissionBlockId } }
                     );
@@ -161,21 +126,21 @@ export const importAdBlocks = async (req, res) => {
                         admissionBlockName: block.admissionBlockName,
                         admissionBlockSubject1: block.admissionBlockSubject1,
                         admissionBlockSubject2: block.admissionBlockSubject2,
-                        admissionBlockSubject3: block.admissionBlockSubject3
+                        admissionBlockSubject3: block.admissionBlockSubject3,
                     });
                     results.success.push(block.admissionBlockId);
                 }
             } catch (error) {
                 results.errors.push({
                     id: block.admissionBlockId,
-                    error: error.message
+                    error: error.message,
                 });
             }
         }
 
         res.status(200).json({
             message: "Import hoàn tất",
-            results
+            results,
         });
     } catch (error) {
         console.error("Lỗi khi import dữ liệu khối tuyển sinh:", error);
