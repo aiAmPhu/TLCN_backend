@@ -19,19 +19,6 @@ export const getAllAdmissionBlocks = async () => {
     return adBlocks;
 };
 
-export const getSubjectsByAdmissionBlockId = async (admissionBlockId) => {
-    const adBlock = await AdmissionBlock.findOne({ where: { admissionBlockId } });
-    if (!adBlock) {
-        throw new ApiError(404, "Không tìm thấy khối tuyển sinh");
-    }
-    const subjects = [
-        adBlock.admissionBlockSubject1,
-        adBlock.admissionBlockSubject2,
-        adBlock.admissionBlockSubject3,
-    ].filter((subject) => subject !== null);
-    return subjects;
-};
-
 export const updateAdmissionBlock = async (id, data) => {
     const adBlock = await AdmissionBlock.findOne({ where: { admissionBlockId: id } });
     if (!adBlock) {

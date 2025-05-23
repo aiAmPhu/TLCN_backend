@@ -23,20 +23,6 @@ export const getAllAdBlocks = async (req, res) => {
     }
 };
 
-export const getAllSubjectsByAdmissionBlockId = async (req, res) => {
-    try {
-        const { admissionBlockId } = req.params;
-        const subjects = await admissionBlockService.getSubjectsByAdmissionBlockId(admissionBlockId);
-        res.status(200).json({ subjects });
-    } catch (error) {
-        console.error("Lỗi khi lấy danh sách môn học:", error.message);
-        const statusCode = error.statusCode || 500;
-        res.status(statusCode).json({
-            message: error.message || "Lỗi phát sinh trong quá trình lấy môn học",
-        });
-    }
-};
-
 export const updateAdBlock = async (req, res) => {
     try {
         const { id } = req.params;
