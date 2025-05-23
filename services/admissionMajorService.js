@@ -53,3 +53,12 @@ export const updateAdMajor = async (id, data) => {
     await AdmissionMajor.update(data, { where: { majorId: id } });
     return "Cập nhật ngành tuyển sinh thành công.";
 };
+
+export const deleteAdMajor = async (id) => {
+    const existingMajor = await AdmissionMajor.findOne({ where: { majorId: id } });
+    if (!existingMajor) {
+        throw new ApiError(404, "Không tìm thấy ngành tuyển sinh.");
+    }
+    await AdmissionMajor.destroy({ where: { majorId: id } });
+    return "Xóa ngành tuyển sinh thành công.";
+};

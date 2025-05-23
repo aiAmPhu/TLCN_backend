@@ -64,14 +64,11 @@ export const updateAdMajor = async (req, res) => {
 export const deleteAdMajor = async (req, res) => {
     try {
         const { id } = req.params;
-        const existingMajor = await AdmissionMajor.findOne({ where: { majorId: id } });
-        if (!existingMajor) {
-            return res.status(404).json({ message: "Không tìm thấy ngành tuyển sinh." });
-        }
-        await AdmissionMajor.destroy({ where: { majorId: id } });
-        res.status(200).json({ message: "Xóa ngành tuyển sinh thành công." });
+        const message = await admissionMajorService.deleteAdMajor(id);
+        res.status(200).json({ message });
     } catch (error) {
-        console.error("Lỗi khi xóa ngành tuyển sinh:", error);
-        res.status(500).json({ message: "Đã xảy ra lỗi khi xóa ngành tuyển sinh." });
+        const status = error.statusCode || 500;
+        const message = error.message || "Đã xảy ra lỗi khi xóa ngành tuyển sinh.";
+        res.status(status).json({ message });
     }
 };
