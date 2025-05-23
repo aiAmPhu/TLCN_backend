@@ -1,67 +1,53 @@
-import AdCriteria from "../models/admissionCriteria.js";
+import * as admissionCriteriaService from "../services/admissionCriteriaService.js";
 
 export const addAdCriteria = async (req, res) => {
     try {
-        const { criteriaId, criteriaName, criteriaDescription } = req.body;
-        const existingCriteria = await AdCriteria.findOne({ where: { criteriaId } });
-        if (existingCriteria) {
-            return res.status(400).json({ message: "Tiêu chí xét tuyển đã tồn tại." });
-        }
-        await AdCriteria.create({
-            criteriaId,
-            criteriaName,
-            criteriaDescription,
-        });
-        res.status(201).json({ message: "Thêm tiêu chí xét tuyển thành công." });
+        const message = await admissionCriteriaService.addAdCriteria(req.body);
+        res.status(201).json({ message });
     } catch (error) {
-        console.error("Lỗi khi thêm tiêu chí xét tuyển:", error);
-        res.status(500).json({ message: "Lỗi server khi thêm tiêu chí xét tuyển." });
+        console.error("Lỗi khi thêm tiêu chí xét tuyển:", error.message);
+        const statusCode = error.statusCode || 500;
+        res.status(statusCode).json({
+            message: error.message || "Lỗi server khi thêm tiêu chí xét tuyển.",
+        });
     }
 };
 
 export const getAllAdCriterias = async (req, res) => {
     try {
-        const criterias = await AdCriteria.findAll();
-        if (!criterias || criterias.length === 0) {
-            return res.status(404).json({ message: "Không có tiêu chí xét tuyển nào." });
-        }
-        res.status(200).json(criterias);
+        const adCriterias = await admissionCriteriaService.getAllAdmissionCriterias();
+        res.status(200).json(adCriterias);
     } catch (error) {
-        console.error("Lỗi khi lấy danh sách tiêu chí xét tuyển:", error);
-        res.status(500).json({ message: "Lỗi server khi lấy danh sách tiêu chí xét tuyển." });
+        console.error("Lỗi khi lấy danh sách chỉ tiêu:", error.message);
+        const statusCode = error.statusCode || 500;
+        res.status(statusCode).json({ message: error.message || "Lỗi phát sinh trong quá trình lấy dữ liệu" });
     }
 };
 
 export const updateAdCriteria = async (req, res) => {
-    const { id } = req.params;
-    const { criteriaName, criteriaDescription } = req.body;
     try {
-        const criteria = await AdCriteria.findByPk(id);
-        if (!criteria) {
-            return res.status(404).json({ message: "Không tìm thấy tiêu chí xét tuyển." });
-        }
-        await criteria.update({
-            criteriaName: criteriaName || criteria.criteriaName,
-            criteriaDescription: criteriaDescription || criteria.criteriaDescription,
-        });
-        res.status(200).json({ message: "Cập nhật tiêu chí xét tuyển thành công!" });
+        const { id } = req.params;
+        const message = await admissionCriteriaService.updateAdmissionCriteria(id, req.body);
+        res.status(200).json({ message });
     } catch (error) {
-        console.error("Lỗi khi cập nhật tiêu chí xét tuyển:", error);
-        res.status(500).json({ message: "Lỗi server khi cập nhật tiêu chí xét tuyển." });
+        console.error("Lỗi khi cập nhật tiêu chí xét tuyển:", error.message);
+        const statusCode = error.statusCode || 500;
+        res.status(statusCode).json({
+            message: error.message || "Lỗi server khi cập nhật tiêu chí xét tuyển.",
+        });
     }
 };
 
 export const deleteAdCriteria = async (req, res) => {
-    const { id } = req.params;
     try {
-        const criteria = await AdCriteria.findByPk(id);
-        if (!criteria) {
-            return res.status(404).json({ message: "Không tìm thấy tiêu chí xét tuyển." });
-        }
-        await criteria.destroy();
-        res.status(200).json({ message: "Xóa tiêu chí xét tuyển thành công!" });
+        const { id } = req.params;
+        const message = await admissionCriteriaService.deleteAdmissionCriteria(id);
+        res.status(200).json({ message });
     } catch (error) {
-        console.error("Lỗi khi xóa tiêu chí xét tuyển:", error);
-        res.status(500).json({ message: "Lỗi server khi xóa tiêu chí xét tuyển." });
+        console.error("Lỗi khi xóa tiêu chí xét tuyển:", error.message);
+        const statusCode = error.statusCode || 500;
+        res.status(statusCode).json({
+            message: error.message || "Lỗi server khi xóa tiêu chí xét tuyển.",
+        });
     }
 };
