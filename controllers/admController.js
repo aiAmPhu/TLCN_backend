@@ -1,98 +1,63 @@
 import AdmissionMajor from "../models/admissionMajor.js";
-import AdmissionBlock from "../models/admissionBlock.js";
+import * as admissionMajorService from "../services/admissionMajorService.js";
 
 export const addAdMajor = async (req, res) => {
     try {
-        const { majorId, majorCodeName, majorName, majorCombination, majorDescription } = req.body;
-        const existingMajor = await AdmissionMajor.findOne({ where: { majorId } });
-        if (existingMajor) {
-            return res.status(400).json({ message: "Chuyên ngành đã tồn tại" });
-        }
-        // Lấy danh sách khối hợp lệ từ AdmissionBlock
-        const blocks = await AdmissionBlock.findAll({
-            attributes: ["admissionBlockId"],
-        });
-        const validBlocks = new Set(blocks.map((block) => block.admissionBlockId));
-        // Kiểm tra từng khối trong majorCombination
-        const invalidBlocks = majorCombination.filter((block) => !validBlocks.has(block));
-        if (invalidBlocks.length > 0) {
-            return res.status(400).json({
-                message: `Các khối sau không hợp lệ (không có trong bảng Blocks): ${invalidBlocks.join(", ")}.`,
-            });
-        }
-        const newMajor = new AdmissionMajor({
-            majorId,
-            majorCodeName,
-            majorName,
-            majorCombination,
-            majorDescription,
-        });
-        await newMajor.save();
-        res.status(201).json({ message: "Chuyên ngành đã được tạo" });
+        const message = await admissionMajorService.addAdMajor(req.body);
+        res.status(201).json({ message });
     } catch (error) {
-        console.error("Error adding major:", error);
-        res.status(500).json({ message: error.message });
+        console.error("Lỗi trong quá trình thêm chuyên ngành:", error);
+        res.status(error.statusCode || 500).json({ message: error.message || "Lỗi server" });
     }
 };
 
 export const getAllAdMajors = async (req, res) => {
     try {
-        const majors = await AdmissionMajor.findAll();
-        if (!majors || majors.length === 0) {
-            return res.status(404).json({ message: "Không tìm thấy ngành tuyển sinh nào." });
-        }
+        const majors = await admissionMajorService.getAllAdMajors();
         res.status(200).json(majors);
     } catch (error) {
         console.error("Lỗi khi lấy danh sách ngành tuyển sinh:", error);
-        res.status(500).json({ message: "Đã xảy ra lỗi khi lấy danh sách ngành tuyển sinh." });
+        res.status(error.statusCode || 500).json({
+            message: error.message || "Đã xảy ra lỗi khi lấy danh sách ngành tuyển sinh.",
+        });
     }
 };
 
 export const getMajorByID = async (req, res) => {
     try {
         const { id } = req.params;
-        const major = await AdmissionMajor.findOne({
-            where: { majorId: id },
-        });
-        if (!major) {
-            return res.status(404).json({ message: "Không tìm thấy ngành tuyển sinh này." });
-        }
+        const major = await admissionMajorService.getMajorByID(id);
         res.status(200).json(major);
     } catch (error) {
+        const statusCode = error.statusCode || 500;
+        const message = error.message || "Đã xảy ra lỗi khi lấy thông tin ngành tuyển sinh.";
         console.error("Lỗi khi lấy thông tin ngành tuyển sinh:", error);
-        res.status(500).json({ message: "Đã xảy ra lỗi khi lấy thông tin ngành tuyển sinh." });
+        res.status(statusCode).json({ message });
     }
 };
 
 export const getMajorCombinationByID = async (req, res) => {
     try {
         const { id } = req.params;
-        const major = await AdmissionMajor.findOne({
-            where: { majorId: id },
-        });
-        if (!major) {
-            return res.status(404).json({ message: "Không tìm thấy ngành tuyển sinh." });
-        }
-        res.status(200).json({ majorCombination: major.majorCombination });
+        const majorCombination = await admissionMajorService.getMajorCombinationByID(id);
+        res.status(200).json({ majorCombination });
     } catch (error) {
-        console.error("Lỗi khi lấy tổ hợp xét tuyển:", error);
-        res.status(500).json({ message: "Đã xảy ra lỗi khi lấy tổ hợp xét tuyển." });
+        const status = error.statusCode || 500;
+        const message = error.message || "Đã xảy ra lỗi khi lấy tổ hợp xét tuyển.";
+        console.error("Lỗi khi lấy tổ hợp ngành xét tuyển:", error);
+        res.status(status).json({ message });
     }
 };
 
 export const updateAdMajor = async (req, res) => {
     try {
         const { id } = req.params;
-        const updateData = req.body;
-        const existingMajor = await AdmissionMajor.findOne({ where: { majorId: id } });
-        if (!existingMajor) {
-            return res.status(404).json({ message: "Không tìm thấy ngành tuyển sinh." });
-        }
-        await AdmissionMajor.update(updateData, { where: { majorId: id } });
-        res.status(200).json({ message: "Cập nhật ngành tuyển sinh thành công." });
+        const message = await admissionMajorService.updateAdMajor(id, req.body);
+        res.status(200).json({ message });
     } catch (error) {
-        console.error("Lỗi khi cập nhật ngành tuyển sinh:", error);
-        res.status(500).json({ message: "Đã xảy ra lỗi khi cập nhật ngành tuyển sinh." });
+        const status = error.statusCode || 500;
+        const message = error.message || "Đã xảy ra lỗi khi cập nhật ngành tuyển sinh.";
+        res.status(status).json({ message });
     }
 };
 
