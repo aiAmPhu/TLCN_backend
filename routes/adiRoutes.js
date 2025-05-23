@@ -3,24 +3,20 @@ import {
     addAdInformation,
     updateAdInformation,
     getAllAdInformation,
-    getAdmissionInformationStatusByID,
     getAdmissionInformationByID,
     acceptAdInformation,
     rejectAdInformation,
-    getFirstAndLastNameByID,
     getBasicAdmissionInfo,
 } from "../controllers/adiController.js";
 import { authenticate, authorizeRoles } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.post("/add", authenticate, authorizeRoles("user"), addAdInformation);
-router.put("/update/:id", authenticate, authorizeRoles("user"), updateAdInformation);
-router.put("/accept/:id", authenticate, authorizeRoles("reviewer"), acceptAdInformation);
-router.put("/reject/:id", authenticate, authorizeRoles("reviewer"), rejectAdInformation);
-router.get("/getall", authenticate, authorizeRoles("reviewer"), getAllAdInformation);
-router.get("/getStatus/:id", authenticate, authorizeRoles("reviewer"), getAdmissionInformationStatusByID);
-router.get("/getAdi/:id", authenticate, authorizeRoles("reviewer", "user"), getAdmissionInformationByID);
-router.get("/getFaLName/:id", authenticate, authorizeRoles("reviewer", "user"), getFirstAndLastNameByID);
-router.get("/getBasicInfo/:userId", authenticate, authorizeRoles("user"), getBasicAdmissionInfo);
+router.post("/add", authenticate, authorizeRoles("user", "admin"), addAdInformation);
+router.put("/update/:id", authenticate, authorizeRoles("user", "admin"), updateAdInformation);
+router.put("/accept/:id", authenticate, authorizeRoles("reviewer", "admin"), acceptAdInformation);
+router.put("/reject/:id", authenticate, authorizeRoles("reviewer", "admin"), rejectAdInformation);
+router.get("/getall", authenticate, authorizeRoles("reviewer", "admin"), getAllAdInformation);
+router.get("/getAdi/:id", authenticate, authorizeRoles("reviewer", "user", "admin"), getAdmissionInformationByID);
+router.get("/getBasicInfo/:id", authenticate, authorizeRoles("user", "admin"), getBasicAdmissionInfo);
 export default router;
