@@ -1,4 +1,3 @@
-import AdmissionMajor from "../models/admissionMajor.js";
 import * as admissionMajorService from "../services/admissionMajorService.js";
 
 export const addAdMajor = async (req, res) => {
