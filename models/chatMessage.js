@@ -27,9 +27,21 @@ const ChatMessage = sequelize.define('ChatMessage', {
         type: DataTypes.DATE,
         defaultValue: DataTypes.NOW
     },
-    isRead: {
+    status: {
+        type: DataTypes.ENUM('sent', 'delivered', 'read'),
+        defaultValue: 'sent'
+    },
+    isDeleted: {
         type: DataTypes.BOOLEAN,
         defaultValue: false
+    },
+    deletedAt: {
+        type: DataTypes.DATE,
+        allowNull: true
+    },
+    reactions: {
+        type: DataTypes.JSON,
+        defaultValue: {}
     }
 }, {
     timestamps: true

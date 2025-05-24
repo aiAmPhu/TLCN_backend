@@ -2,6 +2,7 @@ import { Server } from 'socket.io';
 import jwt from 'jsonwebtoken';
 
 let io;
+const onlineUsers = new Map();
 
 export const initializeSocket = (server) => {
     io = new Server(server, {
@@ -30,6 +31,13 @@ export const initializeSocket = (server) => {
 
     io.on('connection', (socket) => {
         console.log('User connected:', socket.id, 'User:', socket.user.userId);
+        
+        // Add user to online users
+        onlineUsers.set(socket.user.userId, socket.id);
+        io.emit('user_status_change', {
+            userId: socket.user.userId,
+            status: 'online'
+        });
 
         // Join a chat room
         socket.on('join_room', (roomId) => {
@@ -54,9 +62,34 @@ export const initializeSocket = (server) => {
                 return socket.emit('error', { message: 'Unauthorized' });
             }
 
+            // Emit to room with sent status
             io.to(data.roomId).emit('receive_message', {
                 ...data,
+                status: 'sent',
                 timestamp: new Date()
+            });
+
+            // Emit delivered status to sender
+            socket.emit('message_status', {
+                messageId: data.id,
+                status: 'delivered'
+            });
+        });
+
+        // Handle message read status
+        socket.on('mark_as_read', (data) => {
+            io.to(data.roomId).emit('message_status', {
+                messageId: data.messageId,
+                status: 'read'
+            });
+        });
+
+        // Handle message reactions
+        socket.on('add_reaction', (data) => {
+            io.to(data.roomId).emit('message_reaction', {
+                messageId: data.messageId,
+                reaction: data.reaction,
+                userId: socket.user.userId
             });
         });
 
@@ -68,9 +101,21 @@ export const initializeSocket = (server) => {
             });
         });
 
+        // Handle message deletion
+        socket.on('delete_message', (data) => {
+            io.to(data.roomId).emit('message_deleted', {
+                messageId: data.messageId
+            });
+        });
+
         // Handle disconnection
         socket.on('disconnect', () => {
             console.log('User disconnected:', socket.id, 'User:', socket.user.userId);
+            onlineUsers.delete(socket.user.userId);
+            io.emit('user_status_change', {
+                userId: socket.user.userId,
+                status: 'offline'
+            });
         });
     });
 
@@ -82,4 +127,8 @@ export const getIO = () => {
         throw new Error('Socket.io not initialized!');
     }
     return io;
+};
+
+export const isUserOnline = (userId) => {
+    return onlineUsers.has(userId);
 };

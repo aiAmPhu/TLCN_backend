@@ -1,5 +1,13 @@
 import express from 'express';
-import { getChatHistory, sendMessage, markAsRead, getAllMessages } from '../controllers/chatController.js';
+import { 
+    getChatHistory, 
+    sendMessage, 
+    updateMessageStatus, 
+    getAllMessages,
+    addReaction,
+    deleteMessage,
+    searchMessages
+} from '../controllers/chatController.js';
 import { authenticate, authorizeRoles } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -10,6 +18,9 @@ router.get('/admin/all-messages', authenticate, authorizeRoles('admin'), getAllM
 // User routes (requires authentication)
 router.get('/history/:roomId', authenticate, getChatHistory);
 router.post('/send', authenticate, sendMessage);
-router.post('/read', authenticate, markAsRead);
+router.put('/status', authenticate, updateMessageStatus);
+router.post('/reaction', authenticate, addReaction);
+router.delete('/:messageId', authenticate, deleteMessage);
+router.get('/search', authenticate, searchMessages);
 
 export default router;
