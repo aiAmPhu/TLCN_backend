@@ -1,64 +1,47 @@
 import AdmissionRegion from "../models/admissionRegion.js"; // Đổi tên model thành AdRegion
-
+import * as admissionRegionService from "../services/admissionRegionService.js";
 export const addAdRegion = async (req, res) => {
     try {
-        const { regionId, regionName, regionScored } = req.body;
-        const existingRegion = await AdmissionRegion.findOne({ where: { regionId } });
-        if (existingRegion) {
-            return res.status(400).json({ message: "Region ID đã tồn tại." });
-        }
-        await AdmissionRegion.create({
-            regionId,
-            regionName,
-            regionScored,
-        });
-        res.status(201).json({ message: "Thêm khu vực thành công." });
+        const message = await admissionRegionService.addAdRegion(req.body);
+        res.status(201).json({ message });
     } catch (error) {
-        console.error("Lỗi khi thêm khu vực:", error);
-        res.status(500).json({ message: "Lỗi khi thêm khu vực." });
+        const status = error.statusCode || 500;
+        const message = error.message || "Lỗi khi thêm khu vực tuyển sinh.";
+        res.status(status).json({ message });
     }
 };
 
 export const getAllAdRegions = async (req, res) => {
     try {
-        const regions = await AdmissionRegion.findAll();
-        if (regions.length === 0) {
-            return res.status(404).json({ message: "Không có vùng tuyển sinh nào." });
-        }
+        const regions = await admissionRegionService.getAllAdRegions();
         res.status(200).json(regions);
     } catch (error) {
-        console.error("Lỗi khi lấy danh sách vùng tuyển sinh:", error);
-        res.status(500).json({ message: "Đã xảy ra lỗi khi lấy danh sách vùng tuyển sinh." });
+        const status = error.statusCode || 500;
+        const message = error.message || "Đã xảy ra lỗi khi lấy danh sách khu vực tuyển sinh.";
+        res.status(status).json({ message });
     }
 };
 
 export const updateAdRegion = async (req, res) => {
     try {
         const { id } = req.params;
-        const { regionName, regionScored } = req.body;
-        const existingRegion = await AdmissionRegion.findOne({ where: { regionId: id } });
-        if (!existingRegion) {
-            return res.status(404).json({ message: "Không tìm thấy vùng tuyển sinh với ID này." });
-        }
-        await AdmissionRegion.update({ regionName, regionScored }, { where: { regionId: id } });
-        res.status(200).json({ message: "Cập nhật vùng tuyển sinh thành công." });
+        const result = await admissionRegionService.updateAdRegion(id, req.body);
+        res.status(200).json(result);
     } catch (error) {
-        console.error("Lỗi khi cập nhật vùng tuyển sinh:", error);
-        res.status(500).json({ message: "Đã xảy ra lỗi khi cập nhật vùng tuyển sinh." });
+        const status = error.statusCode || 500;
+        const message = error.message || "Đã xảy ra lỗi khi cập nhật khu vực tuyển sinh.";
+        res.status(status).json({ message });
     }
 };
 
 export const deleteAdRegion = async (req, res) => {
     try {
         const { id } = req.params;
-        const existingRegion = await AdmissionRegion.findOne({ where: { regionId: id } });
-        if (!existingRegion) {
-            return res.status(404).json({ message: "Không tìm thấy vùng tuyển sinh với ID này." });
-        }
-        await AdmissionRegion.destroy({ where: { regionId: id } });
-        res.status(200).json({ message: "Xóa vùng tuyển sinh thành công." });
+        const result = await admissionRegionService.deleteAdRegion(id);
+        res.status(200).json(result);
     } catch (error) {
-        console.error("Lỗi khi xóa vùng tuyển sinh:", error);
-        res.status(500).json({ message: "Đã xảy ra lỗi khi xóa vùng tuyển sinh." });
+        const status = error.statusCode || 500;
+        const message = error.message || "Đã xảy ra lỗi khi xóa vùng tuyển sinh.";
+        res.status(status).json({ message });
     }
 };
