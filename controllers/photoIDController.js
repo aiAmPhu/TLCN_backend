@@ -1,50 +1,25 @@
-import PhotoID from "../models/photoID.js";
+import * as photoIDService from "../services/photoIDService.js";
 
 export const addPhotoID = async (req, res) => {
     try {
-        const { userId, personalPic, birthCertificate, frontCCCD, backCCCD, grade10Pic, grade11Pic, grade12Pic } = req.body;
-        const existingPhoto = await PhotoID.findOne({ where: { userId } });
-        if (existingPhoto) {
-            return res.status(400).json({ message: "User đã tồn tại." });
-        }
-        await PhotoID.create({
-            userId,
-            personalPic,
-            birthCertificate,
-            frontCCCD,
-            backCCCD,
-            grade10Pic,
-            grade11Pic,
-            grade12Pic,
-            status: "waiting",
-            feedback: null,
-        });
-        res.status(201).json({ message: "Thêm ảnh thành công!" });
+        const result = await photoIDService.addPhotoID(req.body);
+        res.status(201).json(result);
     } catch (error) {
-        if (error instanceof Sequelize.ForeignKeyConstraintError) {
-            return res.status(422).json({
-                message: "Dữ liệu không hợp lệ: liên kết khóa ngoại không tồn tại (userId không tồn tại).",
-            });
-        }
-        console.error("Lỗi khi thêm ảnh:", error);
-        res.status(500).json({ message: "Đã xảy ra lỗi khi thêm ảnh", error: error.message });
+        res.status(error.statusCode || 500).json({
+            message: error.message || "Đã xảy ra lỗi khi thêm ảnh",
+        });
     }
 };
 
 export const acceptPhotoID = async (req, res) => {
     try {
         const { userId } = req.params;
-        const photo = await PhotoID.findOne({ where: { userId } });
-        if (!photo) {
-            return res.status(404).json({ message: "Không tìm thấy ảnh hồ sơ" });
-        }
-        await photo.update({ status: "accepted" });
-        res.json({
-            message: "Đã chấp nhận ảnh hồ sơ thành công!",
-        });
+        const result = await photoIDService.acceptPhotoID(userId);
+        res.json(result);
     } catch (error) {
-        console.error("Lỗi khi thêm ảnh hồ sơ", error);
-        res.status(500).json({ message: "Lỗi hệ thống, vui lòng thử lại sau!" });
+        res.status(error.statusCode || 500).json({
+            message: error.message || "Lỗi hệ thống, vui lòng thử lại sau!",
+        });
     }
 };
 
@@ -52,17 +27,12 @@ export const rejectPhotoID = async (req, res) => {
     try {
         const { userId } = req.params;
         const { feedback } = req.body;
-        const photo = await PhotoID.findOne({ where: { userId } });
-        if (!photo) {
-            return res.status(404).json({ message: "Không tìm thấy ảnh hồ sơ!" });
-        }
-        await photo.update({ status: "rejected", feedback });
-        res.json({
-            message: "Từ chối ảnh hồ sơ thành công!",
-        });
+        const result = await photoIDService.rejectPhotoID(userId, feedback);
+        res.json(result);
     } catch (error) {
-        console.error("Lỗi khi từ chối ảnh hồ sơ:", error);
-        res.status(500).json({ message: "Lỗi hệ thống, vui lòng thử lại sau!" });
+        res.status(error.statusCode || 500).json({
+            message: error.message || "Lỗi hệ thống, vui lòng thử lại sau!",
+        });
     }
 };
 
@@ -70,73 +40,32 @@ export const updatePhotoID = async (req, res) => {
     try {
         const { userId } = req.params;
         const updatedData = req.body;
-        const photo = await PhotoID.findOne({ where: { userId } });
-        if (!photo) {
-            return res.status(404).json({ message: "Không tìm thấy ảnh hồ sơ!" });
-        }
-        updatedData.status = "waiting";
-        updatedData.feedback = null;
-        await photo.update(updatedData);
-        res.json({
-            message: "Cập nhật ảnh hồ sơ thành công!.",
-        });
+        const result = await photoIDService.updatePhotoID(userId, updatedData);
+        res.json(result);
     } catch (error) {
-        console.error("Lỗi khi cập nhật ảnh hồ sơ:", error);
-        res.status(500).json({ message: "Lỗi hệ thống, vui lòng thử lại sau!" });
+        res.status(error.statusCode || 500).json({
+            message: error.message || "Lỗi hệ thống, vui lòng thử lại sau!",
+        });
     }
 };
 
 export const getAllPhotos = async (req, res) => {
     try {
-        const photos = await PhotoID.findAll();
-        if (photos.length === 0) {
-            return res.status(404).json({ message: "Không có ảnh hồ sơ nào!" });
-        }
-        res.json({
-            message: "Lấy danh sách ảnh hồ sơ thành công!",
-            data: photos,
-        });
+        const photos = await photoIDService.getAllPhotos();
+        res.json({ message: "Lấy danh sách ảnh hồ sơ thành công!", data: photos });
     } catch (error) {
-        console.error("Lỗi khi lấy danh sách ảnh hồ sơ:", error);
-        res.status(500).json({ message: "Lỗi hệ thống, vui lòng thử lại sau!" });
-    }
-};
-
-export const getPhotoStatusByUID = async (req, res) => {
-    try {
-        const { userId } = req.params;
-        const photo = await PhotoID.findOne({
-            where: { userId },
-            attributes: ["status"],
+        res.status(error.statusCode || 500).json({
+            message: error.message || "Lỗi hệ thống, vui lòng thử lại sau!",
         });
-        if (!photo) {
-            return res.status(404).json({ message: "Không tìm thấy ảnh hồ sơ cho người dùng này!" });
-        }
-        res.json({
-            message: "Lấy trạng thái ảnh hồ sơ thành công!",
-            status: photo.status,
-        });
-    } catch (error) {
-        console.error("Lỗi khi lấy trạng thái ảnh hồ sơ:", error);
-        res.status(500).json({ message: "Lỗi hệ thống, vui lòng thử lại sau!" });
     }
 };
 
 export const getPhotoByUID = async (req, res) => {
     try {
         const { userId } = req.params;
-        const photo = await PhotoID.findOne({
-            where: { userId },
-        });
-        if (!photo) {
-            return res.status(404).json({ message: "Không tìm thấy ảnh hồ sơ cho người dùng này!" });
-        }
-        res.json({
-            message: "Lấy ảnh hồ sơ thành công!",
-            data: photo,
-        });
+        const photo = await photoIDService.getPhotoByUID(userId);
+        res.json({ message: "Lấy ảnh hồ sơ thành công!", data: photo });
     } catch (error) {
-        console.error("Lỗi khi lấy ảnh hồ sơ:", error);
-        res.status(500).json({ message: "Lỗi hệ thống, vui lòng thử lại sau!" });
+        res.status(error.statusCode || 500).json({ message: error.message || "Lỗi hệ thống, vui lòng thử lại sau!" });
     }
 };

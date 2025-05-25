@@ -1,4 +1,4 @@
-import User from "../models/User.js";
+import User from "../models/user.js";
 
 export const updatePermission = async (req, res) => {
     try {
@@ -15,9 +15,9 @@ export const updatePermission = async (req, res) => {
         }
 
         console.log("Current user data:", user.toJSON());
-        
+
         await user.update({ majorGroup });
-        
+
         // Fetch updated user to verify changes
         const updatedUser = await User.findByPk(userId);
         console.log("Updated user data:", updatedUser.toJSON());
@@ -44,4 +44,4 @@ export const deletePermission = async (req, res) => {
         console.error("Error deleting permissions:", error);
         res.status(500).json({ message: "Error deleting permissions" });
     }
-}; 
+};
