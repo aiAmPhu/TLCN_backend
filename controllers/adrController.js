@@ -1,4 +1,5 @@
 import * as admissionRegionService from "../services/admissionRegionService.js";
+
 export const addAdRegion = async (req, res) => {
     try {
         const message = await admissionRegionService.addAdRegion(req.body);

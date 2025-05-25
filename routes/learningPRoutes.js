@@ -14,7 +14,7 @@ import { authenticate, authorizeRoles } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.post("/add", authenticate, authorizeRoles("user", "admin"), addLearningProcess);
+router.post("/add", authenticate, authorizeRoles("user"), addLearningProcess);
 router.put("/update/:userId", authenticate, authorizeRoles("user"), updateLearningProcess);
 router.delete("/delete/:userId", authenticate, authorizeRoles("admin"), deleteLearningProcess); // Cần chỉnh role
 router.put("/accept/:userId", authenticate, authorizeRoles("reviewer"), acceptLearningProcess);

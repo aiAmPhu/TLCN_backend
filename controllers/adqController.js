@@ -1,6 +1,3 @@
-import AdmissionQuantity from "../models/admissionQuantity.js";
-import AdmissionMajor from "../models/admissionMajor.js";
-import AdmissionCriteria from "../models/admissionCriteria.js";
 import * as admissionQuantityService from "../services/admissionQuantityService.js";
 
 export const addAdQuantity = async (req, res) => {
