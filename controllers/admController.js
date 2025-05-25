@@ -1,4 +1,5 @@
 import * as admissionMajorService from "../services/admissionMajorService.js";
+import AdmissionBlock from "../models/admissionBlock.js";
 
 export const addAdMajor = async (req, res) => {
     try {
@@ -69,5 +70,20 @@ export const deleteAdMajor = async (req, res) => {
         const status = error.statusCode || 500;
         const message = error.message || "Đã xảy ra lỗi khi xóa ngành tuyển sinh.";
         res.status(status).json({ message });
+    }
+};
+
+export const getAllAdmissionBlocks = async (req, res) => {
+    try {
+        const blocks = await AdmissionBlock.findAll();
+        if (!blocks || blocks.length === 0) {
+            throw new ApiError(404, "Không tìm thấy khối xét tuyển nào.");
+        }
+        res.status(200).json(blocks);
+    } catch (error) {
+        console.error("Lỗi khi lấy danh sách khối xét tuyển:", error);
+        res.status(error.statusCode || 500).json({
+            message: error.message || "Đã xảy ra lỗi khi lấy danh sách khối xét tuyển.",
+        });
     }
 };
