@@ -1,4 +1,3 @@
-import AdmissionRegion from "../models/admissionRegion.js"; // Đổi tên model thành AdRegion
 import * as admissionRegionService from "../services/admissionRegionService.js";
 export const addAdRegion = async (req, res) => {
     try {
