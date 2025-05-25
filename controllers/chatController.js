@@ -9,7 +9,7 @@ export const getAllMessages = async (req, res) => {
             where: {
                 isDeleted: false
             },
-            order: [['timestamp', 'DESC']]
+            order: [['timestamp', 'ASC']] // Đổi DESC thành ASC
         });
         res.json(messages);
     } catch (error) {
