@@ -1,7 +1,3 @@
-import sequelize from "../config/db.js";
-import { Transcript, Score } from "../models/associations.js";
-import Subject from "../models/Subject.js";
-
 import * as transcriptService from "../services/transcriptService.js";
 
 export const addTranscript = async (req, res) => {
