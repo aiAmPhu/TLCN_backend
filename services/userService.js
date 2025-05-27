@@ -161,3 +161,45 @@ export const verifyOTP = async (email, otp, otpStore) => {
     delete otpStore[email];
     return { message: "Xác thực thành công!" };
 };
+
+export const sendOTPForReset = async (email, otpStore) => {
+    if (!email) throw new ApiError(400, "Email is required");
+    const regex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!regex.test(email)) throw new ApiError(400, "Email không hợp lệ");
+    // Kiểm tra email có tồn tại trong database không
+    const existingUser = await User.findOne({ where: { email } });
+    if (!existingUser) throw new ApiError(404, "Email không tồn tại trong hệ thống!");
+    const otp = Math.floor(100000 + Math.random() * 900000);
+    otpStore[email] = otp;
+    setTimeout(() => {
+        delete otpStore[email];
+    }, 5 * 60 * 1000); // 5 phút
+    const transporter = nodemailer.createTransport({
+        service: "Gmail",
+        auth: {
+            user: "bophantuyensinhute@gmail.com",
+            pass: process.env.NODE_MAIL_PASSWORD,
+        },
+    });
+    await transporter.sendMail({
+        from: "Bộ phận tuyển sinh UTE",
+        to: email,
+        subject: "Mã xác nhận OTP - Quên mật khẩu",
+        text: `Mã OTP để đặt lại mật khẩu của bạn là: ${otp}. Mã sẽ hết hạn sau 5 phút.`,
+    });
+    return { message: "Đã gửi OTP tới email!" };
+};
+
+export const resetPassword = async (email, newPassword) => {
+    const user = await User.findOne({ where: { email } });
+    if (!user) {
+        throw new ApiError(404, "Không tìm thấy người dùng");
+    }
+    if (!isValidPassword(newPassword)) {
+        throw new ApiError(400, "Mật khẩu phải có ít nhất 8 ký tự, chỉ gồm chữ cái và số");
+    }
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    user.password = hashedPassword;
+    await user.save();
+    return { message: "Đổi mật khẩu thành công" };
+};

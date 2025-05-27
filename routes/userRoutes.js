@@ -7,6 +7,8 @@ import {
     sendOTP,
     verifyOTP,
     changePassword,
+    sendOTPForReset,
+    resetPassword,
     // addUserNoOTP,
 } from "../controllers/userController.js";
 import { authenticate, authorizeRoles } from "../middleware/authMiddleware.js";
@@ -21,4 +23,6 @@ router.put("/changePassword/:userId", authenticate, authorizeRoles("user", "admi
 router.delete("/delete/:userId", authenticate, authorizeRoles("user", "admin"), deleteUser); // Cần chỉnh lại role
 router.post("/sendOTP", sendOTP);
 router.post("/verifyOTP", verifyOTP);
+router.post("/send-otp-reset", sendOTPForReset);
+router.post("/reset-password", resetPassword);
 export default router;

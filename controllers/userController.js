@@ -78,3 +78,25 @@ export const verifyOTP = async (req, res) => {
         res.status(error.statusCode || 500).json({ message: error.message || "Xác thực OTP thất bại!" });
     }
 };
+
+export const sendOTPForReset = async (req, res) => {
+    const { email } = req.body;
+    try {
+        const result = await userService.sendOTPForReset(email, otpStore);
+        res.status(200).json(result);
+    } catch (error) {
+        console.error("Lỗi gửi OTP reset:", error);
+        res.status(error.statusCode || 500).json({ message: error.message || "Gửi OTP thất bại!" });
+    }
+};
+
+export const resetPassword = async (req, res) => {
+    const { email, newPassword } = req.body;
+    try {
+        const result = await userService.resetPassword(email, newPassword);
+        res.status(200).json(result);
+    } catch (error) {
+        console.error("Lỗi reset mật khẩu:", error.message);
+        res.status(error.statusCode || 500).json({ message: error.message || "Reset mật khẩu thất bại" });
+    }
+};
