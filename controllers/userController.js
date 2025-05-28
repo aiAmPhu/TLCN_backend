@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 import * as userService from "../services/userService.js";
-
+import * as admissionWishService from "../services/admissionWishService.js";
+import User from "../models/user.js";
 dotenv.config();
 const otpStore = {};
 
@@ -98,5 +99,30 @@ export const resetPassword = async (req, res) => {
     } catch (error) {
         console.error("Lỗi reset mật khẩu:", error.message);
         res.status(error.statusCode || 500).json({ message: error.message || "Reset mật khẩu thất bại" });
+    }
+};
+
+export const getUsersForReviewer = async (req, res) => {
+    try {
+        const reviewerUserId = req.user.userId;
+        // Lấy reviewer info để trả về majorGroup
+        const reviewer = await User.findByPk(reviewerUserId);
+        if (!reviewer) {
+            return res.status(404).json({ message: "Reviewer không tồn tại" });
+        }
+        // Lấy users qua admissionWishService
+        const users = await admissionWishService.getWishesByReviewerPermission(reviewerUserId);
+        res.status(200).json({
+            message: "Lấy danh sách người dùng thành công",
+            data: {
+                users: users,
+                reviewerMajors: reviewer.majorGroup || [],
+            },
+        });
+    } catch (error) {
+        console.error("Lỗi khi lấy danh sách người dùng cho reviewer:", error.message);
+        res.status(error.statusCode || 500).json({
+            message: error.message || "Lỗi trong quá trình lấy thông tin",
+        });
     }
 };

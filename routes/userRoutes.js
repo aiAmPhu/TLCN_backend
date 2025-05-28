@@ -9,6 +9,7 @@ import {
     changePassword,
     sendOTPForReset,
     resetPassword,
+    getUsersForReviewer,
     // addUserNoOTP,
 } from "../controllers/userController.js";
 import { authenticate, authorizeRoles } from "../middleware/authMiddleware.js";
@@ -25,4 +26,5 @@ router.post("/sendOTP", sendOTP);
 router.post("/verifyOTP", verifyOTP);
 router.post("/send-otp-reset", sendOTPForReset);
 router.post("/reset-password", resetPassword);
+router.get("/getForReviewer", authenticate, authorizeRoles("reviewer"), getUsersForReviewer);
 export default router;

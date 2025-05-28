@@ -14,5 +14,5 @@ router.post("/add", authenticate, authorizeRoles("user", "admin"), addAdmissionW
 router.get("/getAll/:uId", authenticate, authorizeRoles("user"), getAllWishesByUID);
 router.get("/getAccepted", authenticate, authorizeRoles("admin"), getAcceptedWish);
 router.put("/filter", authenticate, authorizeRoles("admin"), filterAdmissionResults);
-router.put("/resetStatus", authenticate, authorizeRoles("admin"), resetAllWishesStatus);
+router.put("/resetStatus", resetAllWishesStatus);
 export default router;

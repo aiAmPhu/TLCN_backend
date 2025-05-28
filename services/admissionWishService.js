@@ -7,6 +7,7 @@ import AdmissionRegions from "../models/admissionRegion.js";
 import AdmissionObjects from "../models/admissionObject.js";
 import LearningProcess from "../models/learningProcess.js";
 import AdmissionQuantity from "../models/admissionQuantity.js";
+import User from "../models/user.js";
 import { Op } from "sequelize";
 import { ApiError } from "../utils/ApiError.js";
 
@@ -186,4 +187,36 @@ export const resetAllWishesStatus = async () => {
     return {
         message: `Đã đặt lại trạng thái cho ${affectedRows} nguyện vọng.`,
     };
+};
+
+export const getWishesByReviewerPermission = async (reviewerUserId) => {
+    // Lấy majorGroup của reviewer
+    const reviewer = await User.findByPk(reviewerUserId);
+    if (!reviewer || !reviewer.majorGroup || reviewer.majorGroup.length === 0) {
+        throw new ApiError(403, "Reviewer chưa được phân quyền ngành nào");
+    }
+    // Lấy wishes có majorId trong majorGroup của reviewer
+    const wishes = await AdmissionWishes.findAll({
+        where: {
+            majorId: {
+                [Op.in]: reviewer.majorGroup,
+            },
+        },
+        attributes: ["wishId", "priority", "criteriaId", "admissionBlockId", "majorId", "uId", "scores", "status"],
+    });
+    if (wishes.length === 0) {
+        return [];
+    }
+    // Lấy unique userIds từ wishes
+    const userIds = [...new Set(wishes.map((wish) => wish.uId))];
+    // Lấy thông tin user
+    const users = await User.findAll({
+        where: {
+            userId: {
+                [Op.in]: userIds,
+            },
+        },
+        attributes: ["userId", "name", "email"],
+    });
+    return users; // Trả về danh sách users thay vì wishes
 };

@@ -11,7 +11,17 @@ export const updatePermission = async (userId, majorGroup) => {
         throw new ApiError(404, "User not found");
     }
     console.log("Current user data:", user.toJSON());
-    await user.update({ majorGroup });
+    // Tự động chuyển role thành reviewer nếu có majorGroup
+    const updateData = { majorGroup };
+    if (majorGroup && majorGroup.length > 0) {
+        updateData.role = "reviewer";
+        console.log("Auto-setting role to reviewer due to majorGroup assignment");
+    } else {
+        // Nếu xóa hết majorGroup thì chuyển về user
+        updateData.role = "user";
+        console.log("Auto-setting role to user due to empty majorGroup");
+    }
+    await user.update(updateData);
     // Fetch updated user to verify changes
     const updatedUser = await User.findByPk(userId);
     console.log("Updated user data:", updatedUser.toJSON());
@@ -23,6 +33,9 @@ export const deletePermission = async (userId) => {
     if (!user) {
         throw new ApiError(404, "User not found");
     }
-    await user.update({ majorGroup: [] });
+    await user.update({
+        majorGroup: [],
+        role: "user",
+    });
     return { message: "Permissions deleted successfully" };
 };
