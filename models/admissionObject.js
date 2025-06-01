@@ -18,4 +18,4 @@ const AdmissionObject = sequelize.define(
     }
 );
 
-export default AdmissionObject
+export default AdmissionObject;

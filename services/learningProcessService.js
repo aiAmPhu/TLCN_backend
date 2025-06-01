@@ -82,8 +82,8 @@ export const getLearningProcessByUID = async (userId) => {
         throw new ApiError(404, "Không tìm thấy dữ liệu cho userId này.");
     }
     const jsonData = learningProcess.toJSON();
-    jsonData.priorityGroup = jsonData.admission_object?.objectName || jsonData.priorityGroup;
-    jsonData.region = jsonData.AdmissionRegion?.regionName || jsonData.region;
+    jsonData.priorityGroup = jsonData.admission_object?.objectName; // || jsonData.priorityGroup;
+    jsonData.region = jsonData.AdmissionRegion?.regionName; // || jsonData.region;
     delete jsonData.admission_object;
     delete jsonData.AdmissionRegion;
     return jsonData;
