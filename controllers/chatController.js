@@ -48,6 +48,20 @@ export const getChatHistory = async (req, res) => {
             }
         );
 
+        // Notify sender that messages are read
+        const io = getIO();
+        if (io) {
+            const unreadMessages = messages.filter(msg => 
+                msg.senderId !== userId && msg.status !== 'read'
+            );
+            unreadMessages.forEach(msg => {
+                io.to(`user_${msg.senderId}`).emit('message_status', {
+                    messageId: msg.id,
+                    status: 'read'
+                });
+            });
+        }
+
         res.json(messages);
     } catch (error) {
         console.error('Error in getChatHistory:', error);
@@ -90,9 +104,17 @@ export const sendMessage = async (req, res) => {
 
         const io = getIO();
         if (io) {
+            // Emit to room
             io.to(roomId).emit('receive_message', {
                 ...message.toJSON(),
                 timestamp: new Date()
+            });
+
+            // Emit to receiver's personal room if they're not in the chat room
+            io.to(`user_${receiverId}`).emit('new_message_notification', {
+                roomId,
+                senderId,
+                content
             });
         }
 
@@ -127,6 +149,16 @@ export const updateMessageStatus = async (req, res) => {
         }
 
         await message.update({ status });
+
+        // Notify sender about status change
+        const io = getIO();
+        if (io) {
+            io.to(`user_${message.senderId}`).emit('message_status', {
+                messageId,
+                status
+            });
+        }
+
         res.json(message);
     } catch (error) {
         console.error('Error in updateMessageStatus:', error);
@@ -158,6 +190,16 @@ export const addReaction = async (req, res) => {
         reactions[userId] = reaction;
         await message.update({ reactions });
 
+        // Notify all participants about the reaction
+        const io = getIO();
+        if (io) {
+            io.to(message.roomId).emit('message_reaction', {
+                messageId,
+                reaction,
+                userId
+            });
+        }
+
         res.json(message);
     } catch (error) {
         console.error('Error in addReaction:', error);
@@ -186,6 +228,14 @@ export const deleteMessage = async (req, res) => {
             isDeleted: true,
             deletedAt: new Date()
         });
+
+        // Notify all participants about the deletion
+        const io = getIO();
+        if (io) {
+            io.to(message.roomId).emit('message_deleted', {
+                messageId
+            });
+        }
 
         res.json({ message: 'Message deleted successfully' });
     } catch (error) {

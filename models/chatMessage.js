@@ -42,6 +42,10 @@ const ChatMessage = sequelize.define('ChatMessage', {
     reactions: {
         type: DataTypes.JSON,
         defaultValue: {}
+    },
+    unreadCount: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0
     }
 }, {
     timestamps: true

@@ -1,8 +1,11 @@
 import { Server } from 'socket.io';
 import jwt from 'jsonwebtoken';
+import ChatMessage from '../models/chatMessage.js';
+import { Op } from 'sequelize';
 
 let io;
 const onlineUsers = new Map();
+const userRooms = new Map();
 
 export const initializeSocket = (server) => {
     io = new Server(server, {
@@ -39,10 +42,27 @@ export const initializeSocket = (server) => {
             status: 'online'
         });
 
+        // Join user's personal room
+        const userRoom = `user_${socket.user.userId}`;
+        socket.join(userRoom);
+        userRooms.set(socket.user.userId, userRoom);
+
         // Join a chat room
-        socket.on('join_room', (roomId) => {
+        socket.on('join_room', async (roomId) => {
             socket.join(roomId);
             console.log(`User ${socket.user.userId} joined room: ${roomId}`);
+            
+            // Reset unread count when joining room
+            await ChatMessage.update(
+                { unreadCount: 0 },
+                {
+                    where: {
+                        roomId,
+                        receiverId: socket.user.userId,
+                        status: { [Op.ne]: 'read' }
+                    }
+                }
+            );
         });
 
         // Leave a chat room
@@ -52,7 +72,7 @@ export const initializeSocket = (server) => {
         });
 
         // Handle new messages
-        socket.on('send_message', (data) => {
+        socket.on('send_message', async (data) => {
             // Verify user is part of the room
             if (data.senderId !== socket.user.userId) {
                 console.error('Unauthorized message attempt:', {
@@ -62,12 +82,31 @@ export const initializeSocket = (server) => {
                 return socket.emit('error', { message: 'Unauthorized' });
             }
 
+            // Increment unread count for receiver
+            await ChatMessage.increment('unreadCount', {
+                where: {
+                    roomId: data.roomId,
+                    receiverId: data.receiverId
+                }
+            });
+
             // Emit to room with sent status
             io.to(data.roomId).emit('receive_message', {
                 ...data,
                 status: 'sent',
                 timestamp: new Date()
             });
+
+            // Emit to receiver's personal room if they're not in the chat room
+            const receiverRoom = userRooms.get(data.receiverId);
+            if (receiverRoom) {
+                io.to(receiverRoom).emit('new_message_notification', {
+                    roomId: data.roomId,
+                    senderId: data.senderId,
+                    content: data.content,
+                    unreadCount: await getUnreadCount(data.receiverId)
+                });
+            }
 
             // Emit delivered status to sender
             socket.emit('message_status', {
@@ -77,7 +116,17 @@ export const initializeSocket = (server) => {
         });
 
         // Handle message read status
-        socket.on('mark_as_read', (data) => {
+        socket.on('mark_as_read', async (data) => {
+            await ChatMessage.update(
+                { status: 'read', unreadCount: 0 },
+                {
+                    where: {
+                        roomId: data.roomId,
+                        receiverId: socket.user.userId
+                    }
+                }
+            );
+
             io.to(data.roomId).emit('message_status', {
                 messageId: data.messageId,
                 status: 'read'
@@ -112,6 +161,7 @@ export const initializeSocket = (server) => {
         socket.on('disconnect', () => {
             console.log('User disconnected:', socket.id, 'User:', socket.user.userId);
             onlineUsers.delete(socket.user.userId);
+            userRooms.delete(socket.user.userId);
             io.emit('user_status_change', {
                 userId: socket.user.userId,
                 status: 'offline'
@@ -120,6 +170,17 @@ export const initializeSocket = (server) => {
     });
 
     return io;
+};
+
+// Helper function to get unread count
+const getUnreadCount = async (userId) => {
+    const result = await ChatMessage.sum('unreadCount', {
+        where: {
+            receiverId: userId,
+            status: { [Op.ne]: 'read' }
+        }
+    });
+    return result || 0;
 };
 
 export const getIO = () => {
