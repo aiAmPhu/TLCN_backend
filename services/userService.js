@@ -16,7 +16,7 @@ const isValidPassword = (password) => {
     return regex.test(password);
 };
 
-export const addUser = async ({ name, email, password, role, pic }) => {
+export const addUser = async ({ name, email, password, role }) => {
     if (!isValidEmail(email)) {
         throw new ApiError(400, "Email không hợp lệ");
     }
@@ -36,7 +36,6 @@ export const addUser = async ({ name, email, password, role, pic }) => {
         email,
         password: hashedPassword,
         role,
-        pic,
     });
     await AdmissionInformation.create({
         userId: newUser.userId,
@@ -67,7 +66,7 @@ export const getAllUsers = async () => {
     return users;
 };
 
-export const updateUser = async (userId, { name, email, password, role, pic }) => {
+export const updateUser = async (userId, { name, email, password, role }) => {
     const user = await User.findByPk(userId);
     if (!user) {
         throw new ApiError(404, "Không tìm thấy người dùng");
@@ -81,7 +80,6 @@ export const updateUser = async (userId, { name, email, password, role, pic }) =
     if (name !== undefined) user.name = name;
     if (email !== undefined) user.email = email;
     if (role !== undefined) user.role = role;
-    if (pic !== undefined) user.pic = pic;
     if (password !== undefined) {
         const hashedPassword = await bcrypt.hash(password, 10);
         user.password = hashedPassword;

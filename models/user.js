@@ -12,7 +12,6 @@ const User = sequelize.define(
         email: { type: DataTypes.STRING, allowNull: true },
         password: { type: DataTypes.STRING, allowNull: true },
         role: { type: DataTypes.STRING, allowNull: true },
-        pic: { type: DataTypes.STRING, allowNull: true },
         majorGroup: {
             type: DataTypes.JSON,
             allowNull: true,
