@@ -1,8 +1,8 @@
 import { DataTypes } from "sequelize";
 import sequelize from "../config/db.js";
 
-const AdYear = sequelize.define(
-    "AdYear",
+const AdmissionYear = sequelize.define(
+    "AdmissionYear",
     {
         yearId: {
             type: DataTypes.STRING,
@@ -25,6 +25,10 @@ const AdYear = sequelize.define(
             type: DataTypes.STRING,
             allowNull: true,
         },
+        description: {
+            type: DataTypes.TEXT,
+            allowNull: true,
+        },
     },
     {
         tableName: "admission_years",
@@ -32,4 +36,4 @@ const AdYear = sequelize.define(
     }
 );
 
-export default AdYear;
+export default AdmissionYear;

@@ -30,7 +30,7 @@ app.use("/api", uploadRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/adbs", adbRoutes);
 app.use("/api/adms", admRoutes);
-app.use("/api/adys", yearRoutes);
+app.use("/api/admissionYear", yearRoutes);
 app.use("/api/adcs", adcRoutes);
 app.use("/api/adrs", adrRoutes);
 app.use("/api/ados", adoRoutes);

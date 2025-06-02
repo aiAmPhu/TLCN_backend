@@ -1,96 +1,130 @@
-import AdYear from "../models/admissionYear.js"; // Đổi tên model thành AdMajor
-import cron from "node-cron";
-import { Op } from "sequelize";
-
-export const addAdYear = async (req, res) => {
+import * as admissionYearService from "../services/admissionYearService.js";
+// Tạo năm tuyển sinh mới
+export const createAdmissionYear = async (req, res) => {
     try {
-        const { yearId, yearName, startDate, endDate, status } = req.body;
-        const existingYear = await AdYear.findOne({ where: { yearId } });
-        if (existingYear) {
-            return res.status(400).json({ message: "Năm tuyển sinh đã tồn tại." });
-        }
-        await AdYear.create({
-            yearId,
-            yearName,
-            startDate,
-            endDate,
-            status: status || "inactive",
+        const year = await admissionYearService.createAdmissionYear(req.body);
+        res.status(201).json({
+            message: "Tạo năm tuyển sinh thành công",
+            data: year,
         });
-        res.status(201).json({ message: "Thêm năm tuyển sinh thành công!" });
     } catch (error) {
-        console.error("Lỗi khi thêm năm tuyển sinh:", error);
-        res.status(500).json({ message: "Đã xảy ra lỗi khi thêm năm tuyển sinh." });
+        res.status(error.statusCode || 500).json({
+            message: error.message || "Lỗi khi tạo năm tuyển sinh",
+        });
     }
 };
-
-export const getAllAdYears = async (req, res) => {
+// Lấy toàn bộ thông tin năm tuyển sinh
+export const getAllAdmissionYears = async (req, res) => {
     try {
-        const adYears = await AdYear.findAll({
-            order: [["yearId", "DESC"]],
+        const years = await admissionYearService.getAllAdmissionYears();
+        res.status(200).json({
+            message: "Lấy danh sách năm tuyển sinh thành công",
+            data: years,
         });
-        res.status(200).json({ message: "Lấy danh sách năm tuyển sinh thành công!", data: adYears });
     } catch (error) {
-        console.error("Lỗi khi lấy danh sách năm tuyển sinh:", error);
-        res.status(500).json({ message: "Đã xảy ra lỗi khi lấy danh sách năm tuyển sinh." });
+        res.status(500).json({
+            message: "Lỗi khi lấy danh sách năm tuyển sinh",
+        });
     }
 };
-
-export const updateAdYear = async (req, res) => {
+// Kích hoạt năm tuyển sinh
+export const activateAdmissionYear = async (req, res) => {
     try {
         const { yearId } = req.params;
-        const updateData = req.body;
-        const existingYear = await AdYear.findOne({ where: { yearId } });
-        if (!existingYear) {
-            return res.status(404).json({ message: "Năm tuyển sinh không tồn tại!" });
-        }
-        await AdYear.update(updateData, { where: { yearId } });
-        res.status(200).json({ message: "Cập nhật năm tuyển sinh thành công!" });
+        const result = await admissionYearService.activateAdmissionYear(yearId);
+        res.status(200).json(result);
     } catch (error) {
-        console.error("Lỗi khi cập nhật năm tuyển sinh:", error);
-        res.status(500).json({ message: "Đã xảy ra lỗi khi cập nhật năm tuyển sinh." });
+        res.status(error.statusCode || 500).json({
+            message: error.message || "Lỗi khi kích hoạt năm tuyển sinh",
+        });
     }
 };
-
-export const deleteAdYear = async (req, res) => {
+// Tuỳ chỉnh năm tuyển sinh
+export const configureAdmissionYear = async (req, res) => {
     try {
         const { yearId } = req.params;
-        const existingYear = await AdYear.findOne({ where: { yearId } });
-        if (!existingYear) {
-            return res.status(404).json({ message: "Năm tuyển sinh không tồn tại!" });
+        const configData = req.body;
+        console.log("Controller received - Year ID:", yearId);
+        console.log("Controller received - Config data:", JSON.stringify(configData, null, 2));
+        // Kiểm tra quyền chỉnh sửa
+        const canEdit = await admissionYearService.canEditConfig(yearId);
+        if (!canEdit) {
+            return res.status(403).json({
+                message: "Chỉ có thể cấu hình năm tuyển sinh đang hoạt động",
+            });
         }
-        await AdYear.destroy({ where: { yearId } });
-        res.status(200).json({ message: "Xóa năm tuyển sinh thành công!" });
+        const result = await admissionYearService.configureAdmissionYear(yearId, configData);
+        res.status(200).json({
+            message: "Cấu hình năm tuyển sinh thành công",
+            data: result,
+        });
     } catch (error) {
-        console.error("Lỗi khi xóa năm tuyển sinh:", error);
-        res.status(500).json({ message: "Đã xảy ra lỗi khi xóa năm tuyển sinh." });
+        console.error("Controller error:", error);
+        res.status(error.statusCode || 500).json({
+            message: error.message || "Lỗi khi cấu hình năm tuyển sinh",
+        });
     }
 };
-
-// Hàm cập nhật trạng thái AdYear
-export const updateAdYearStatus = async () => {
+// Lấy cấu hình năm tuyển sinh
+export const getAdmissionYearConfig = async (req, res) => {
     try {
-        const currentDate = new Date();
-        const updatedRows = await AdYear.update(
-            { status: "inactive" },
-            {
-                where: {
-                    endDate: { [Op.lte]: currentDate }, // endDate <= ngày hiện tại
-                    status: { [Op.ne]: "inactive" }, // status chưa phải inactive
-                },
-            }
-        );
-        if (updatedRows[0] > 0) {
-            console.log(`Đã cập nhật ${updatedRows[0]} bản ghi AdYear thành inactive.`);
-        }
+        const { yearId } = req.params;
+        console.log("Getting config for year:", yearId);
+
+        const config = await admissionYearService.getAdmissionYearConfig(yearId);
+
+        res.status(200).json({
+            message: "Lấy cấu hình thành công",
+            data: config,
+        });
     } catch (error) {
-        console.error("Lỗi khi cập nhật trạng thái AdYear:", error);
+        console.error("Get config error:", error);
+        res.status(error.statusCode || 500).json({
+            message: error.message || "Lỗi khi lấy cấu hình",
+        });
     }
 };
-
-// Lên lịch chạy hàng ngày lúc 00:00
-export const scheduleAdYearStatusUpdate = () => {
-    cron.schedule("0 0 * * *", () => {
-        console.log("Chạy tác vụ cập nhật trạng thái AdYear...");
-        updateAdYearStatus();
-    });
+// Lấy mục xét tuyển
+export const getActiveYearOptions = async (req, res) => {
+    try {
+        const options = await admissionYearService.getActiveYearOptions();
+        res.status(200).json({
+            message: "Lấy options thành công",
+            data: options,
+        });
+    } catch (error) {
+        res.status(500).json({
+            message: "Lỗi khi lấy options",
+        });
+    }
+};
+// So sánh năm tuyển sinh
+export const compareYears = async (req, res) => {
+    try {
+        const { yearIds } = req.query;
+        const comparison = await admissionYearService.compareYears(yearIds.split(","));
+        res.status(200).json({
+            message: "So sánh năm thành công",
+            data: comparison,
+        });
+    } catch (error) {
+        res.status(500).json({
+            message: "Lỗi khi so sánh năm",
+        });
+    }
+};
+// Thống kê theo năm học
+export const getYearStatistics = async (req, res) => {
+    try {
+        const { yearId } = req.params;
+        const stats = await admissionYearService.getYearStatistics(yearId);
+        res.status(200).json({
+            message: "Lấy thống kê thành công",
+            data: stats,
+        });
+    } catch (error) {
+        res.status(500).json({
+            message: "Lỗi khi lấy thống kê",
+        });
+    }
 };

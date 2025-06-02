@@ -24,11 +24,6 @@ const AdmissionMajor = sequelize.define(
             type: DataTypes.TEXT,
             allowNull: true,
         },
-        isActive: {
-            type: DataTypes.BOOLEAN,
-            allowNull: true,
-            defaultValue: true, // Giá trị mặc định là `true`
-        },
     },
     {
         tableName: "admission_majors",
