@@ -8,10 +8,6 @@ const AdmissionMajor = sequelize.define(
             type: DataTypes.STRING,
             primaryKey: true,
         },
-        majorCodeName: {
-            type: DataTypes.STRING,
-            allowNull: true,
-        },
         majorName: {
             type: DataTypes.STRING,
             allowNull: true,
