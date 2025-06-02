@@ -1,5 +1,18 @@
 import * as admissionWishService from "../services/admissionWishService.js";
 
+export const getWishFormData = async (req, res) => {
+    try {
+        const userId = req.user.userId;
+        const result = await admissionWishService.getActiveYearWishData(userId);
+        res.status(200).json(result);
+    } catch (error) {
+        console.error("Error getting wish form data:", error);
+        res.status(error.statusCode || 500).json({
+            message: error.message || "Lỗi khi lấy dữ liệu nguyện vọng",
+        });
+    }
+};
+
 export const addAdmissionWish = async (req, res) => {
     try {
         const result = await admissionWishService.addAdmissionWish(req.body);

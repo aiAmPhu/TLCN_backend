@@ -1,4 +1,8 @@
 import AdmissionWishes from "../models/admissionWishes.js";
+import AdmissionYearConfig from "../models/admissionYearConfig.js";
+import AdmissionYear from "../models/admissionYear.js";
+import AdmissionMajor from "../models/admissionMajor.js";
+import AdmissionCriteria from "../models/admissionCriteria.js";
 import Transcripts from "../models/Transcript.js";
 import Scores from "../models/Score.js";
 import AdmissionBlocks from "../models/admissionBlock.js";
@@ -11,11 +15,162 @@ import User from "../models/user.js";
 import { Op } from "sequelize";
 import sequelize from "../config/db.js";
 import { ApiError } from "../utils/ApiError.js";
+import { raw } from "mysql2";
+export const getActiveYearWishData = async (userId) => {
+    try {
+        // Lấy năm active
+        const activeYear = await AdmissionYear.findOne({
+            where: { status: "active" },
+        });
+        if (!activeYear) {
+            throw new ApiError(400, "Không có năm tuyển sinh nào đang hoạt động");
+        }
+        // Lấy config của năm active
+        const config = await AdmissionYearConfig.findOne({
+            where: {
+                yearId: activeYear.yearId,
+                isActive: true,
+            },
+        });
+        if (!config) {
+            throw new ApiError(400, "Năm tuyển sinh chưa được cấu hình");
+        }
+        // Lấy chi tiết criteria, majors, blocks dựa trên IDs trong config
+        const [criteria, majors, allBlocks, userWishes] = await Promise.all([
+            // Lấy criteria theo IDs
+            AdmissionCriteria.findAll({
+                where: {
+                    criteriaId: { [Op.in]: config.criteriaIds || [] },
+                },
+                attributes: ["criteriaId", "criteriaName"],
+            }),
+            // Lấy majors theo IDs
+            AdmissionMajor.findAll({
+                where: {
+                    majorId: { [Op.in]: config.majorIds || [] },
+                },
+                attributes: ["majorId", "majorName", "majorCodeName", "majorCombination"],
+            }),
+            // Lấy tất cả blocks
+            AdmissionBlocks.findAll({
+                attributes: ["admissionBlockId", "admissionBlockName"],
+            }),
+            // Lấy wishes của user
+            AdmissionWishes.findAll({
+                where: { uId: userId },
+                attributes: ["wishId", "priority", "criteriaId", "admissionBlockId", "majorId", "scores", "status"],
+                include: [
+                    {
+                        model: AdmissionMajor,
+                        attributes: ["majorName", "majorCodeName"],
+                    },
+                    {
+                        model: AdmissionCriteria,
+                        attributes: ["criteriaName"],
+                    },
+                    {
+                        model: AdmissionBlocks,
+                        attributes: ["admissionBlockName"],
+                    },
+                ],
+                order: [["priority", "ASC"]],
+            }),
+        ]);
+        const formattedWishes = userWishes.map((wish) => {
+            // Lấy data từ Sequelize instance
+            const wishData = wish.get ? wish.get({ plain: true }) : wish;
+            return {
+                wishId: wishData.wishId,
+                priority: wishData.priority,
+                criteriaId: wishData.criteriaId,
+                admissionBlockId: wishData.admissionBlockId,
+                majorId: wishData.majorId,
+                scores: wishData.scores,
+                status: wishData.status,
+                // Include data từ associations
+                majorName: wishData.AdmissionMajor?.majorName || "",
+                majorCodeName: wishData.AdmissionMajor?.majorCodeName || "",
+                criteriaName: wishData.AdmissionCriterium?.criteriaName || "",
+                admissionBlockName: wishData.AdmissionBlock?.admissionBlockName || "",
+            };
+        });
+
+        // Tạo majors với available blocks
+        const majorsWithBlocks = majors.map((major) => {
+            const availableBlocks = allBlocks.filter(
+                (block) => major.majorCombination && major.majorCombination.includes(block.admissionBlockId)
+            );
+            return {
+                ...major.toJSON(),
+                availableBlocks,
+            };
+        });
+        // Filter user wishes chỉ lấy những cái thuộc config hiện tại
+        // const allowedCriteriaIds = config.criteriaIds || [];
+        // const allowedMajorIds = config.majorIds || [];
+        // const filteredUserWishes = formattedWishes.filter(
+        //     (wish) => allowedCriteriaIds.includes(wish.criteriaId) && allowedMajorIds.includes(wish.majorId)
+        // );
+        //console.log("Wishes:", filteredUserWishes);
+        return {
+            message: "Lấy dữ liệu nguyện vọng thành công",
+            data: {
+                criteria: criteria || [],
+                majors: majorsWithBlocks,
+                blocks: allBlocks,
+                userWishes: formattedWishes,
+                activeYear: activeYear.yearName,
+                yearId: activeYear.yearId,
+            },
+        };
+    } catch (error) {
+        console.error("Error getting active year wish data:", error);
+        if (error instanceof ApiError) {
+            throw error;
+        }
+        throw new ApiError(500, "Lỗi khi lấy dữ liệu nguyện vọng");
+    }
+};
 
 export const addAdmissionWish = async (data) => {
     const { criteriaId, admissionBlockId, majorId, uId, status } = data;
     if (!criteriaId || !admissionBlockId || !majorId || !uId) {
         throw new ApiError(400, "Thiếu các trường bắt buộc: criteriaId, admissionBlockId, majorId, uId.");
+    }
+    // Kiểm tra với config năm active
+    const activeYear = await AdmissionYear.findOne({
+        where: { status: "active" },
+    });
+    if (!activeYear) {
+        throw new ApiError(400, "Không có năm tuyển sinh nào đang hoạt động");
+    }
+    const config = await AdmissionYearConfig.findOne({
+        where: {
+            yearId: activeYear.yearId,
+            isActive: true,
+        },
+    });
+    if (!config) {
+        throw new ApiError(400, "Năm tuyển sinh chưa được cấu hình");
+    }
+    // Validate options đơn giản
+    if (!config.criteriaIds.includes(criteriaId)) {
+        throw new ApiError(403, "Diện xét tuyển này không được phép trong năm hiện tại");
+    }
+    if (!config.majorIds.includes(majorId)) {
+        throw new ApiError(403, "Ngành học này không được phép trong năm hiện tại");
+    }
+    // Validate block thuộc major
+    const major = await AdmissionMajor.findByPk(majorId);
+    if (!major || !major.majorCombination.includes(admissionBlockId)) {
+        throw new ApiError(400, "Khối xét tuyển không phù hợp với ngành đã chọn");
+    }
+    // Kiểm tra duplicate
+    const existingWish = await AdmissionWishes.findOne({
+        where: { uId, criteriaId, majorId, admissionBlockId },
+    });
+    if (existingWish) {
+        throw new ApiError(400, "Nguyện vọng này đã tồn tại");
     }
     const lastWish = await AdmissionWishes.findOne({ order: [["wishId", "DESC"]], attributes: ["wishId"] });
     const newWishId = lastWish ? lastWish.wishId + 1 : 1;
