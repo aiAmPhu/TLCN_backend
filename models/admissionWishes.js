@@ -81,5 +81,8 @@ const AdmissionWishes = sequelize.define(
 AdmissionWishes.belongsTo(AdmissionCriteria, { foreignKey: "criteriaId" });
 AdmissionWishes.belongsTo(AdmissionBlock, { foreignKey: "admissionBlockId" });
 AdmissionWishes.belongsTo(AdmissionMajor, { foreignKey: "majorId" });
-AdmissionWishes.belongsTo(User, { foreignKey: "uId" });
+AdmissionWishes.belongsTo(User, {
+    foreignKey: "uId",
+    targetKey: "userId",
+});
 export default AdmissionWishes;

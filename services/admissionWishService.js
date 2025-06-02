@@ -9,6 +9,7 @@ import LearningProcess from "../models/learningProcess.js";
 import AdmissionQuantity from "../models/admissionQuantity.js";
 import User from "../models/user.js";
 import { Op } from "sequelize";
+import sequelize from "../config/db.js";
 import { ApiError } from "../utils/ApiError.js";
 
 export const addAdmissionWish = async (data) => {
@@ -189,34 +190,91 @@ export const resetAllWishesStatus = async () => {
     };
 };
 
-export const getWishesByReviewerPermission = async (reviewerUserId) => {
-    // Lấy majorGroup của reviewer
-    const reviewer = await User.findByPk(reviewerUserId);
-    if (!reviewer || !reviewer.majorGroup || reviewer.majorGroup.length === 0) {
-        throw new ApiError(403, "Reviewer chưa được phân quyền ngành nào");
-    }
-    // Lấy wishes có majorId trong majorGroup của reviewer
-    const wishes = await AdmissionWishes.findAll({
-        where: {
-            majorId: {
-                [Op.in]: reviewer.majorGroup,
+export const getFilteredAcceptedWishes = async (filterType, filterValue = null, limit = null) => {
+    let baseQuery = {
+        where: { status: "accepted" },
+        include: [
+            {
+                model: User,
+                attributes: ["userId", "name", "email"],
             },
-        },
-        attributes: ["wishId", "priority", "criteriaId", "admissionBlockId", "majorId", "uId", "scores", "status"],
-    });
-    if (wishes.length === 0) {
-        return [];
+        ],
+        order: [],
+    };
+
+    switch (filterType) {
+        case "top3":
+            // Lọc top 3 điểm cao nhất - Sửa theo kiểu dữ liệu scores
+            if (
+                typeof AdmissionWishes.rawAttributes.scores.type === "object" &&
+                AdmissionWishes.rawAttributes.scores.type.constructor.name === "FLOAT"
+            ) {
+                // Nếu scores là FLOAT
+                baseQuery.order = [["scores", "DESC"]];
+            } else {
+                // Nếu scores là JSON hoặc TEXT
+                baseQuery.order = [[sequelize.literal("CAST(scores AS DECIMAL(5,2))"), "DESC"]];
+            }
+            baseQuery.limit = 3;
+            break;
+
+        case "byMajor":
+            if (!filterValue) {
+                throw new ApiError(400, "Vui lòng chọn ngành để lọc");
+            }
+            baseQuery.where.majorId = filterValue;
+            baseQuery.order = [["scores", "DESC"]];
+            break;
+
+        case "byCriteria":
+            if (!filterValue) {
+                throw new ApiError(400, "Vui lòng chọn diện xét tuyển để lọc");
+            }
+            baseQuery.where.criteriaId = filterValue;
+            baseQuery.order = [["scores", "DESC"]];
+            break;
+
+        case "all":
+        default:
+            baseQuery.order = [["scores", "DESC"]];
+            break;
     }
-    // Lấy unique userIds từ wishes
-    const userIds = [...new Set(wishes.map((wish) => wish.uId))];
-    // Lấy thông tin user
-    const users = await User.findAll({
-        where: {
-            userId: {
-                [Op.in]: userIds,
-            },
-        },
-        attributes: ["userId", "name", "email"],
-    });
-    return users; // Trả về danh sách users thay vì wishes
+
+    if (limit && filterType !== "top3") {
+        baseQuery.limit = limit;
+    }
+    const wishes = await AdmissionWishes.findAll(baseQuery);
+    console.log("Found wishes:", wishes.length);
+    return wishes;
+};
+
+export const getMajorOptions = async () => {
+    try {
+        console.log("Getting major options...");
+        const majors = await AdmissionWishes.findAll({
+            where: { status: "accepted" },
+            attributes: [[sequelize.fn("DISTINCT", sequelize.col("majorId")), "majorId"]],
+            raw: true,
+        });
+        console.log("Found majors:", majors);
+        return majors.map((m) => m.majorId);
+    } catch (error) {
+        console.error("Error in getMajorOptions:", error);
+        throw error;
+    }
+};
+
+export const getCriteriaOptions = async () => {
+    try {
+        const criteria = await AdmissionWishes.findAll({
+            where: { status: "accepted" },
+            attributes: [[sequelize.fn("DISTINCT", sequelize.col("criteriaId")), "criteriaId"]],
+            raw: true,
+        });
+        console.log("Found criteria:", criteria);
+        return criteria.map((c) => c.criteriaId);
+    } catch (error) {
+        console.error("Error in getCriteriaOptions:", error);
+        throw error;
+    }
 };

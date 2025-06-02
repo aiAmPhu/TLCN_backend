@@ -5,6 +5,8 @@ import {
     getAcceptedWish,
     filterAdmissionResults,
     resetAllWishesStatus,
+    getFilteredAccepted,
+    getFilterOptions,
 } from "../controllers/adwController.js";
 import { authenticate, authorizeRoles } from "../middleware/authMiddleware.js";
 
@@ -15,4 +17,6 @@ router.get("/getAll/:uId", authenticate, authorizeRoles("user"), getAllWishesByU
 router.get("/getAccepted", authenticate, authorizeRoles("admin"), getAcceptedWish);
 router.put("/filter", authenticate, authorizeRoles("admin"), filterAdmissionResults);
 router.put("/resetStatus", resetAllWishesStatus);
+router.get("/getFilteredAccepted", authenticate, authorizeRoles("admin"), getFilteredAccepted);
+router.get("/getFilterOptions", authenticate, authorizeRoles("admin"), getFilterOptions);
 export default router;

@@ -59,3 +59,47 @@ export const resetAllWishesStatus = async (req, res) => {
         });
     }
 };
+
+export const getFilteredAccepted = async (req, res) => {
+    try {
+        const { filterType, filterValue, limit } = req.query;
+        console.log("Filter params:", { filterType, filterValue, limit });
+        const wishes = await admissionWishService.getFilteredAcceptedWishes(
+            filterType || "all",
+            filterValue,
+            limit ? parseInt(limit) : null
+        );
+        res.status(200).json({
+            message: "Lấy danh sách trúng tuyển thành công",
+            data: wishes,
+            count: wishes.length,
+        });
+    } catch (error) {
+        console.error("Lỗi khi lấy danh sách trúng tuyển đã lọc:", error);
+        res.status(error.statusCode || 500).json({
+            message: error.message || "Lỗi khi lấy danh sách trúng tuyển",
+        });
+    }
+};
+
+export const getFilterOptions = async (req, res) => {
+    try {
+        const [majors, criteria] = await Promise.all([
+            admissionWishService.getMajorOptions(),
+            admissionWishService.getCriteriaOptions(),
+        ]);
+
+        res.status(200).json({
+            message: "Lấy options thành công",
+            data: {
+                majors,
+                criteria,
+            },
+        });
+    } catch (error) {
+        console.error("Lỗi khi lấy options:", error);
+        res.status(500).json({
+            message: "Lỗi khi lấy options",
+        });
+    }
+};
