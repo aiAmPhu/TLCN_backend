@@ -49,7 +49,7 @@ export const getActiveYearWishData = async (userId) => {
                 where: {
                     majorId: { [Op.in]: config.majorIds || [] },
                 },
-                attributes: ["majorId", "majorName", "majorCodeName", "majorCombination"],
+                attributes: ["majorId", "majorName", "majorCombination"],
             }),
             // Lấy tất cả blocks
             AdmissionBlocks.findAll({
@@ -62,7 +62,7 @@ export const getActiveYearWishData = async (userId) => {
                 include: [
                     {
                         model: AdmissionMajor,
-                        attributes: ["majorName", "majorCodeName"],
+                        attributes: ["majorName"],
                     },
                     {
                         model: AdmissionCriteria,
@@ -89,7 +89,6 @@ export const getActiveYearWishData = async (userId) => {
                 status: wishData.status,
                 // Include data từ associations
                 majorName: wishData.AdmissionMajor?.majorName || "",
-                majorCodeName: wishData.AdmissionMajor?.majorCodeName || "",
                 criteriaName: wishData.AdmissionCriterium?.criteriaName || "",
                 admissionBlockName: wishData.AdmissionBlock?.admissionBlockName || "",
             };
@@ -432,4 +431,36 @@ export const getCriteriaOptions = async () => {
         console.error("Error in getCriteriaOptions:", error);
         throw error;
     }
+};
+
+export const getWishesByReviewerPermission = async (reviewerUserId) => {
+    // Lấy majorGroup của reviewer
+    const reviewer = await User.findByPk(reviewerUserId);
+    if (!reviewer || !reviewer.majorGroup || reviewer.majorGroup.length === 0) {
+        throw new ApiError(403, "Reviewer chưa được phân quyền ngành nào");
+    }
+    // Lấy wishes có majorId trong majorGroup của reviewer
+    const wishes = await AdmissionWishes.findAll({
+        where: {
+            majorId: {
+                [Op.in]: reviewer.majorGroup,
+            },
+        },
+        attributes: ["wishId", "priority", "criteriaId", "admissionBlockId", "majorId", "uId", "scores", "status"],
+    });
+    if (wishes.length === 0) {
+        return [];
+    }
+    // Lấy unique userIds từ wishes
+    const userIds = [...new Set(wishes.map((wish) => wish.uId))];
+    // Lấy thông tin user
+    const users = await User.findAll({
+        where: {
+            userId: {
+                [Op.in]: userIds,
+            },
+        },
+        attributes: ["userId", "name", "email"],
+    });
+    return users; // Trả về danh sách users thay vì wishes
 };
