@@ -15,7 +15,189 @@ import User from "../models/user.js";
 import { Op } from "sequelize";
 import sequelize from "../config/db.js";
 import { ApiError } from "../utils/ApiError.js";
-import { raw } from "mysql2";
+import * as statisticsSnapshotService from "./statisticsSnapshotService.js";
+export const getFilteredWishesForAdmin = async (filterConditions) => {
+    try {
+        const whereCondition = {};
+
+        if (filterConditions.majorIds) {
+            whereCondition.majorId = { [Op.in]: filterConditions.majorIds };
+        }
+
+        if (filterConditions.criteriaIds) {
+            whereCondition.criteriaId = { [Op.in]: filterConditions.criteriaIds };
+        }
+
+        if (filterConditions.blockIds) {
+            whereCondition.admissionBlockId = { [Op.in]: filterConditions.blockIds };
+        }
+
+        if (filterConditions.status) {
+            whereCondition.status = { [Op.in]: filterConditions.status };
+        }
+
+        if (filterConditions.minScore !== undefined || filterConditions.maxScore !== undefined) {
+            whereCondition.scores = {};
+            if (filterConditions.minScore !== undefined) {
+                whereCondition.scores[Op.gte] = filterConditions.minScore;
+            }
+            if (filterConditions.maxScore !== undefined) {
+                whereCondition.scores[Op.lte] = filterConditions.maxScore;
+            }
+        }
+
+        const wishes = await AdmissionWishes.findAll({
+            where: whereCondition,
+            include: [
+                {
+                    model: AdmissionMajor,
+                    attributes: ["majorId", "majorName"],
+                },
+                {
+                    model: AdmissionCriteria,
+                    attributes: ["criteriaId", "criteriaName"],
+                },
+                {
+                    model: AdmissionBlocks,
+                    attributes: [
+                        "admissionBlockId",
+                        "admissionBlockName",
+                        "admissionBlockSubject1",
+                        "admissionBlockSubject2",
+                        "admissionBlockSubject3",
+                    ],
+                },
+                {
+                    model: User,
+                    attributes: ["userId", "name", "email", "role"],
+                },
+            ],
+            order: [
+                ["priority", "ASC"],
+                ["scores", "DESC"],
+                ["createdAt", "DESC"],
+            ],
+        });
+
+        return {
+            message: "Lọc nguyện vọng cho admin thành công",
+            data: wishes,
+        };
+    } catch (error) {
+        console.error("Error filtering wishes for admin:", error);
+        throw new ApiError(500, "Lỗi khi lọc nguyện vọng cho admin");
+    }
+};
+export const getFilterStatistics = async (filterConditions) => {
+    try {
+        const whereCondition = buildWhereConditionFromFilter(filterConditions);
+
+        // Thống kê cơ bản
+        const totalWishes = await AdmissionWishes.count({
+            where: whereCondition,
+        });
+
+        const uniqueStudents = await AdmissionWishes.count({
+            where: whereCondition,
+            distinct: true,
+            col: "uId",
+        });
+
+        // Thống kê theo trạng thái
+        const statusStats = await AdmissionWishes.findAll({
+            where: whereCondition,
+            attributes: ["status", [sequelize.fn("COUNT", sequelize.col("wishId")), "count"]],
+            group: ["status"],
+            raw: true,
+        });
+
+        // Thống kê theo ngành (top 10)
+        const majorStats = await AdmissionWishes.findAll({
+            where: whereCondition,
+            include: [
+                {
+                    model: AdmissionMajor,
+                    attributes: ["majorId", "majorName"],
+                },
+            ],
+            attributes: [
+                [sequelize.fn("COUNT", sequelize.col("AdmissionWishes.wishId")), "wishCount"],
+                [sequelize.fn("COUNT", sequelize.fn("DISTINCT", sequelize.col("uId"))), "studentCount"],
+                [sequelize.fn("AVG", sequelize.col("scores")), "avgScore"],
+            ],
+            group: ["AdmissionMajor.majorId", "AdmissionMajor.majorName"],
+            order: [[sequelize.fn("COUNT", sequelize.col("AdmissionWishes.wishId")), "DESC"]],
+            limit: 10,
+            raw: true,
+        });
+
+        // Thống kê theo diện
+        const criteriaStats = await AdmissionWishes.findAll({
+            where: whereCondition,
+            include: [
+                {
+                    model: AdmissionCriteria,
+                    attributes: ["criteriaId", "criteriaName"],
+                },
+            ],
+            attributes: [
+                [sequelize.fn("COUNT", sequelize.col("AdmissionWishes.wishId")), "wishCount"],
+                [sequelize.fn("COUNT", sequelize.fn("DISTINCT", sequelize.col("uId"))), "studentCount"],
+                [sequelize.fn("AVG", sequelize.col("scores")), "avgScore"],
+            ],
+            group: ["AdmissionCriterium.criteriaId", "AdmissionCriterium.criteriaName"],
+            order: [[sequelize.fn("COUNT", sequelize.col("AdmissionWishes.wishId")), "DESC"]],
+            raw: true,
+        });
+
+        return {
+            overview: {
+                totalWishes,
+                uniqueStudents,
+                averageWishesPerStudent: totalWishes > 0 ? (totalWishes / uniqueStudents).toFixed(2) : 0,
+            },
+            statusBreakdown: statusStats,
+            topMajors: majorStats,
+            criteriaBreakdown: criteriaStats,
+            filterApplied: filterConditions,
+            generatedAt: new Date(),
+        };
+    } catch (error) {
+        console.error("Error getting filter statistics:", error);
+        throw new ApiError(500, "Lỗi khi lấy thống kê filter");
+    }
+};
+const buildWhereConditionFromFilter = (filterConditions) => {
+    const whereCondition = {};
+
+    if (filterConditions.majorIds && filterConditions.majorIds.length > 0) {
+        whereCondition.majorId = { [Op.in]: filterConditions.majorIds };
+    }
+
+    if (filterConditions.criteriaIds && filterConditions.criteriaIds.length > 0) {
+        whereCondition.criteriaId = { [Op.in]: filterConditions.criteriaIds };
+    }
+
+    if (filterConditions.blockIds && filterConditions.blockIds.length > 0) {
+        whereCondition.admissionBlockId = { [Op.in]: filterConditions.blockIds };
+    }
+
+    if (filterConditions.status && filterConditions.status.length > 0) {
+        whereCondition.status = { [Op.in]: filterConditions.status };
+    }
+
+    if (filterConditions.minScore !== undefined || filterConditions.maxScore !== undefined) {
+        whereCondition.scores = {};
+        if (filterConditions.minScore !== undefined) {
+            whereCondition.scores[Op.gte] = filterConditions.minScore;
+        }
+        if (filterConditions.maxScore !== undefined) {
+            whereCondition.scores[Op.lte] = filterConditions.maxScore;
+        }
+    }
+
+    return whereCondition;
+};
 export const getActiveYearWishData = async (userId) => {
     try {
         // Lấy năm active

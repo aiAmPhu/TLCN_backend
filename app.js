@@ -19,6 +19,7 @@ import adwRoutes from "./routes/adwRoutes.js";
 import chatbotRoutes from "./routes/chatbotRoutes.js";
 import permissionRoutes from "./routes/permissionRoutes.js";
 import chatRoutes from "./routes/chatRoutes.js";
+import statisticsSnapshotRoutes from "./routes/statisticsSnapshotRoutes.js";
 
 dotenv.config();
 //connectDB();
@@ -44,5 +45,6 @@ app.use("/api/wish", adwRoutes);
 app.use("/api/chatbot", chatbotRoutes);
 app.use("/api/permissions", permissionRoutes);
 app.use("/api/chat", chatRoutes);
+app.use("/api/snapshots", statisticsSnapshotRoutes);
 
 export default app;

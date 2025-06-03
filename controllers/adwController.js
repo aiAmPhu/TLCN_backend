@@ -1,5 +1,23 @@
 import * as admissionWishService from "../services/admissionWishService.js";
+import AdmissionYear from "../models/admissionYear.js";
+export const getAllYears = async (req, res) => {
+    try {
+        const years = await AdmissionYear.findAll({
+            attributes: ["yearId", "yearName", "status"],
+            order: [["yearName", "DESC"]],
+        });
 
+        res.status(200).json({
+            message: "Lấy danh sách năm thành công",
+            data: years,
+        });
+    } catch (error) {
+        console.error("Error getting years:", error);
+        res.status(500).json({
+            message: "Lỗi khi lấy danh sách năm",
+        });
+    }
+};
 export const getWishFormData = async (req, res) => {
     try {
         const userId = req.user.userId;
