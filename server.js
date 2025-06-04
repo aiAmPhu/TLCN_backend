@@ -7,7 +7,14 @@ import { initializeSocket } from "./services/socketService.js";
 
 dotenv.config();
 const PORT = process.env.PORT || 8080;
-app.use(cors());
+
+// Cấu hình CORS
+app.use(cors({
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization"]
+}));
 
 const syncDB = async () => {
     try {
@@ -18,10 +25,12 @@ const syncDB = async () => {
         const server = createServer(app);
 
         // Initialize Socket.IO
-        initializeSocket(server);
+        const io = initializeSocket(server);
+        console.log("✅ Socket.IO initialized successfully");
 
         server.listen(PORT, () => {
             console.log(`🚀 Server running on port ${PORT}`);
+            console.log(`🔌 Socket.IO server is ready`);
         });
     } catch (error) {
         console.error("❌ Error syncing database:", error.message);

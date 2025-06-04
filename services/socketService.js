@@ -10,11 +10,17 @@ const userRooms = new Map();
 export const initializeSocket = (server) => {
     io = new Server(server, {
         cors: {
-            origin: process.env.CLIENT_URL || "http://localhost:3000",
-            methods: ["GET", "POST"],
-            credentials: true
+            origin: "*", // Cho phép tất cả các origin trong môi trường development
+            methods: ["GET", "POST", "PUT", "DELETE"],
+            credentials: true,
+            allowedHeaders: ["Content-Type", "Authorization"]
         },
-        path: '/socket.io/'
+        path: '/socket.io/',
+        transports: ['websocket', 'polling'],
+        pingTimeout: 60000,
+        pingInterval: 25000,
+        connectTimeout: 45000,
+        allowEIO3: true
     });
 
     // Middleware for authentication

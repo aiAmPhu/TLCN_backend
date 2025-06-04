@@ -77,6 +77,7 @@ export const exportAdBlocks = async (req, res) => {
 export const importAdBlocks = async (req, res) => {
     try {
         const { adBlocks } = req.body;
+        console.log("Received data:", adBlocks); // Log dữ liệu nhận được
 
         if (!Array.isArray(adBlocks)) {
             return res.status(400).json({ message: "Dữ liệu không hợp lệ" });
@@ -89,13 +90,15 @@ export const importAdBlocks = async (req, res) => {
 
         for (const block of adBlocks) {
             try {
+                console.log("Processing block:", block); // Log từng block đang xử lý
+
                 const existingBlock = await AdmissionBlock.findOne({
                     where: { admissionBlockId: block.admissionBlockId },
                 });
 
                 if (existingBlock) {
-                    // Update existing block
-                    await AdmissionBlock.update(
+                    console.log("Updating existing block:", block.admissionBlockId);
+                    const [updatedRows] = await AdmissionBlock.update(
                         {
                             admissionBlockName: block.admissionBlockName,
                             admissionBlockSubject1: block.admissionBlockSubject1,
@@ -104,19 +107,30 @@ export const importAdBlocks = async (req, res) => {
                         },
                         { where: { admissionBlockId: block.admissionBlockId } }
                     );
-                    results.success.push(block.admissionBlockId);
+                    console.log("Update result:", updatedRows);
+                    if (updatedRows > 0) {
+                        results.success.push(block.admissionBlockId);
+                    } else {
+                        throw new Error("Không thể cập nhật khối tuyển sinh");
+                    }
                 } else {
-                    // Create new block
-                    await AdmissionBlock.create({
+                    console.log("Creating new block:", block.admissionBlockId);
+                    const newBlock = await AdmissionBlock.create({
                         admissionBlockId: block.admissionBlockId,
                         admissionBlockName: block.admissionBlockName,
                         admissionBlockSubject1: block.admissionBlockSubject1,
                         admissionBlockSubject2: block.admissionBlockSubject2,
                         admissionBlockSubject3: block.admissionBlockSubject3,
                     });
-                    results.success.push(block.admissionBlockId);
+                    console.log("Create result:", newBlock);
+                    if (newBlock) {
+                        results.success.push(block.admissionBlockId);
+                    } else {
+                        throw new Error("Không thể tạo khối tuyển sinh mới");
+                    }
                 }
             } catch (error) {
+                console.error(`Lỗi khi xử lý khối ${block.admissionBlockId}:`, error);
                 results.errors.push({
                     id: block.admissionBlockId,
                     error: error.message,
@@ -124,12 +138,25 @@ export const importAdBlocks = async (req, res) => {
             }
         }
 
+        // Kiểm tra kết quả sau khi import
+        const totalBlocks = await AdmissionBlock.count();
+        console.log("Total blocks after import:", totalBlocks);
+
         res.status(200).json({
             message: "Import hoàn tất",
             results,
+            summary: {
+                totalProcessed: adBlocks.length,
+                successCount: results.success.length,
+                errorCount: results.errors.length,
+                totalInDatabase: totalBlocks
+            }
         });
     } catch (error) {
         console.error("Lỗi khi import dữ liệu khối tuyển sinh:", error);
-        res.status(500).json({ message: "Lỗi server khi import dữ liệu khối tuyển sinh" });
+        res.status(500).json({ 
+            message: "Lỗi server khi import dữ liệu khối tuyển sinh",
+            error: error.message 
+        });
     }
 };
