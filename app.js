@@ -21,6 +21,8 @@ import permissionRoutes from "./routes/permissionRoutes.js";
 import chatRoutes from "./routes/chatRoutes.js";
 import statisticsSnapshotRoutes from "./routes/statisticsSnapshotRoutes.js";
 import notificationRoutes from './routes/notificationRoutes.js';
+import authRoutes from './routes/authRoutes.js';
+import passport from './config/passport.js';
 
 dotenv.config();
 //connectDB();
@@ -28,6 +30,8 @@ dotenv.config();
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(passport.initialize());
+
 app.use("/api", uploadRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/adbs", adbRoutes);
@@ -48,5 +52,6 @@ app.use("/api/permissions", permissionRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/snapshots", statisticsSnapshotRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/auth', authRoutes);
 
 export default app;
