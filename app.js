@@ -20,6 +20,7 @@ import chatbotRoutes from "./routes/chatbotRoutes.js";
 import permissionRoutes from "./routes/permissionRoutes.js";
 import chatRoutes from "./routes/chatRoutes.js";
 import statisticsSnapshotRoutes from "./routes/statisticsSnapshotRoutes.js";
+import notificationRoutes from './routes/notificationRoutes.js';
 
 dotenv.config();
 //connectDB();
@@ -46,5 +47,6 @@ app.use("/api/chatbot", chatbotRoutes);
 app.use("/api/permissions", permissionRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/snapshots", statisticsSnapshotRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 export default app;

@@ -1,4 +1,5 @@
 import * as learningProcessService from "../services/learningProcessService.js";
+import { createLearningProcessNotification } from "./notificationController.js";
 
 export const addLearningProcess = async (req, res) => {
     try {
@@ -28,6 +29,8 @@ export const acceptLearningProcess = async (req, res) => {
     try {
         const { userId } = req.params;
         const result = await learningProcessService.acceptLearningProcess(userId);
+        // Send notification
+        await createLearningProcessNotification(userId, 'accepted');
         res.status(200).json(result);
     } catch (error) {
         res.status(error.statusCode || 500).json({
@@ -41,6 +44,8 @@ export const rejectLearningProcess = async (req, res) => {
         const { userId } = req.params;
         const { feedback } = req.body;
         const result = await learningProcessService.rejectLearningProcess(userId, feedback);
+        // Send notification
+        await createLearningProcessNotification(userId, 'rejected', feedback);
         res.status(200).json(result);
     } catch (error) {
         res.status(error.statusCode || 500).json({

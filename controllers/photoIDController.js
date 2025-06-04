@@ -1,4 +1,5 @@
 import * as photoIDService from "../services/photoIDService.js";
+import { createPhotoNotification } from "./notificationController.js";
 
 export const addPhotoID = async (req, res) => {
     try {
@@ -15,6 +16,8 @@ export const acceptPhotoID = async (req, res) => {
     try {
         const { userId } = req.params;
         const result = await photoIDService.acceptPhotoID(userId);
+        // Send notification
+        await createPhotoNotification(userId, 'accepted');
         res.json(result);
     } catch (error) {
         res.status(error.statusCode || 500).json({
@@ -28,6 +31,8 @@ export const rejectPhotoID = async (req, res) => {
         const { userId } = req.params;
         const { feedback } = req.body;
         const result = await photoIDService.rejectPhotoID(userId, feedback);
+        // Send notification
+        await createPhotoNotification(userId, 'rejected', feedback);
         res.json(result);
     } catch (error) {
         res.status(error.statusCode || 500).json({

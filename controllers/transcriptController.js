@@ -1,4 +1,5 @@
 import * as transcriptService from "../services/transcriptService.js";
+import { createTranscriptNotification } from "./notificationController.js";
 
 export const addTranscript = async (req, res) => {
     const { userId, scores } = req.body;
@@ -29,6 +30,8 @@ export const acceptTranscript = async (req, res) => {
     const { userId } = req.params;
     try {
         const result = await transcriptService.acceptTranscript(userId);
+        // Send notification
+        await createTranscriptNotification(userId, 'accepted');
         res.status(200).json(result);
     } catch (error) {
         res.status(error.statusCode || 500).json({
@@ -42,6 +45,8 @@ export const rejectTranscript = async (req, res) => {
     const { feedback } = req.body;
     try {
         const result = await transcriptService.rejectTranscript(userId, feedback);
+        // Send notification
+        await createTranscriptNotification(userId, 'rejected', feedback);
         res.status(200).json(result);
     } catch (error) {
         res.status(error.statusCode || 500).json({

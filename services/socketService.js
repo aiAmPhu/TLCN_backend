@@ -10,9 +10,11 @@ const userRooms = new Map();
 export const initializeSocket = (server) => {
     io = new Server(server, {
         cors: {
-            origin: "*",
-            methods: ["GET", "POST"]
-        }
+            origin: process.env.CLIENT_URL || "http://localhost:3000",
+            methods: ["GET", "POST"],
+            credentials: true
+        },
+        path: '/socket.io/'
     });
 
     // Middleware for authentication
@@ -42,7 +44,7 @@ export const initializeSocket = (server) => {
             status: 'online'
         });
 
-        // Join user's personal room
+        // Join user's personal room for notifications
         const userRoom = `user_${socket.user.userId}`;
         socket.join(userRoom);
         userRooms.set(socket.user.userId, userRoom);

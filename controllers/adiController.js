@@ -1,4 +1,5 @@
 import * as admissionInformationService from "../services/admissionInformationService.js";
+import { createAdmissionNotification } from "./notificationController.js";
 
 export const addAdInformation = async (req, res) => {
     try {
@@ -31,6 +32,8 @@ export const acceptAdInformation = async (req, res) => {
     try {
         const { id } = req.params;
         const message = await admissionInformationService.acceptAdmissionInformation(id);
+        // Send notification
+        await createAdmissionNotification(id, 'accepted');
         res.status(200).json({ message });
     } catch (error) {
         console.error("Lỗi khi chấp nhận thông tin tuyển sinh:", error.message);
@@ -45,6 +48,8 @@ export const rejectAdInformation = async (req, res) => {
         const { id } = req.params;
         const { feedback } = req.body;
         const message = await admissionInformationService.rejectAdmissionInformation(id, feedback);
+        // Send notification
+        await createAdmissionNotification(id, 'rejected', feedback);
         res.status(200).json({ message });
     } catch (error) {
         console.error("Lỗi khi từ chối thông tin tuyển sinh:", error.message);
