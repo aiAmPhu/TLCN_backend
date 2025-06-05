@@ -1,6 +1,10 @@
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import User from '../models/user.js';
+import AdmissionInformation from '../models/admissionInfomation.js';
+import LearningProcess from '../models/learningProcess.js';
+import PhotoID from '../models/photoID.js';
+import Transcript from '../models/Transcript.js';
 import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
 
@@ -34,6 +38,45 @@ passport.use(
                         password: hashedPassword,
                         role: 'user', // Mặc định role là user
                     });
+
+                    // Tạo các bản ghi liên quan
+                    await AdmissionInformation.create({
+                        userId: user.userId,
+                        email: user.email,
+                    });
+
+                    await LearningProcess.create({
+                        userId: user.userId,
+                    });
+
+                    await PhotoID.create({
+                        userId: user.userId,
+                    });
+
+                    const lastTranscript = await Transcript.findOne({
+                        order: [["tId", "DESC"]],
+                    });
+                    const newTranscriptId = lastTranscript ? lastTranscript.tId + 1 : 1;
+                    await Transcript.create({
+                        userId: user.userId,
+                        tId: newTranscriptId,
+                    });
+                } else {
+                    // Nếu user đã tồn tại, kiểm tra và tạo các bản ghi liên quan nếu thiếu
+                    const [adInfo, photo, learning, transcript] = await Promise.all([
+                        AdmissionInformation.findOne({ where: { userId: user.userId } }),
+                        PhotoID.findOne({ where: { userId: user.userId } }),
+                        LearningProcess.findOne({ where: { userId: user.userId } }),
+                        Transcript.findOne({ where: { userId: user.userId } }),
+                    ]);
+                    if (!adInfo) await AdmissionInformation.create({ userId: user.userId, email: user.email });
+                    if (!photo) await PhotoID.create({ userId: user.userId });
+                    if (!learning) await LearningProcess.create({ userId: user.userId });
+                    if (!transcript) {
+                        const lastTranscript = await Transcript.findOne({ order: [["tId", "DESC"]] });
+                        const newTranscriptId = lastTranscript ? lastTranscript.tId + 1 : 1;
+                        await Transcript.create({ userId: user.userId, tId: newTranscriptId });
+                    }
                 }
 
                 return done(null, user);
