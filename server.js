@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import sequelize from "./config/db.js";
 import { createServer } from "http";
 import { initializeSocket } from "./services/socketService.js";
+import seedSubjects from "./scripts/seedSubjects.js";
 
 dotenv.config();
 const PORT = process.env.PORT || 8080;
@@ -22,6 +23,9 @@ const syncDB = async () => {
     try {
         await sequelize.sync({ alter: true });
         console.log("Database synchronized successfully");
+
+        // Seed initial data
+        await seedSubjects();
 
         // Create HTTP server
         const server = createServer(app);
