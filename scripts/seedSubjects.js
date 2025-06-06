@@ -1,7 +1,12 @@
 import Subject from "../models/Subject.js";
+import sequelize from "../config/db.js";
 
 const seedSubjects = async () => {
     try {
+        // Đảm bảo kết nối database
+        await sequelize.authenticate();
+        console.log("✅ Database connection successful");
+        
         // Kiểm tra xem đã có dữ liệu môn học chưa
         const existingSubjects = await Subject.findAll();
         
@@ -10,28 +15,31 @@ const seedSubjects = async () => {
             return;
         }
 
-        // Dữ liệu 12 môn học cần khởi tạo
+        // Dữ liệu 12 môn học cần khởi tạo (không include suId vì nó autoIncrement)
         const subjectsData = [
-            { suId: 1, subject: "Toán" },
-            { suId: 2, subject: "Vật Lý" },
-            { suId: 3, subject: "Hóa học" },
-            { suId: 4, subject: "Sinh học" },
-            { suId: 5, subject: "Tin học" },
-            { suId: 6, subject: "Ngữ văn" },
-            { suId: 7, subject: "Lịch sử" },
-            { suId: 8, subject: "Địa lý" },
-            { suId: 9, subject: "Tiếng Anh" },
-            { suId: 10, subject: "Giáo dục Công dân" },
-            { suId: 11, subject: "Công nghệ" },
-            { suId: 12, subject: "Giáo dục Quốc phòng An Ninh" }
+            { subject: "Toán" },
+            { subject: "Vật Lý" },
+            { subject: "Hóa học" },
+            { subject: "Sinh học" },
+            { subject: "Tin học" },
+            { subject: "Ngữ văn" },
+            { subject: "Lịch sử" },
+            { subject: "Địa lý" },
+            { subject: "Tiếng Anh" },
+            { subject: "Giáo dục Công dân" },
+            { subject: "Công nghệ" },
+            { subject: "Giáo dục Quốc phòng An Ninh" }
         ];
 
         // Chèn dữ liệu vào database
-        await Subject.bulkCreate(subjectsData);
-        console.log("✅ Successfully seeded 12 subjects into database");
+        const createdSubjects = await Subject.bulkCreate(subjectsData);
+        console.log(`✅ Successfully seeded ${createdSubjects.length} subjects into database`);
+        
+        return createdSubjects;
         
     } catch (error) {
         console.error("❌ Error seeding subjects:", error.message);
+        console.error("Full error:", error);
         throw error;
     }
 };
