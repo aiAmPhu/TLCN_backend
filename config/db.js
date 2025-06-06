@@ -9,5 +9,4 @@ const sequelize = new Sequelize(process.env.DB_NAME, process.env.DB_USER, proces
     dialect: "mysql", // Đổi thành MySQL
     logging: false, // Ẩn log SQL nếu không cần
 });
-
 export default sequelize;
