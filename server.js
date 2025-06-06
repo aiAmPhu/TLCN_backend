@@ -44,4 +44,5 @@ const syncDB = async () => {
     }
 };
 
+
 syncDB();
