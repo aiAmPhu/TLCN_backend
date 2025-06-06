@@ -9,4 +9,6 @@ router.get("/", getAllSubjects);
 // Route để lấy môn học theo ID  
 router.get("/:id", getSubjectById);
 
+
 export default router; 
+

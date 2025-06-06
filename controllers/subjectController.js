@@ -7,7 +7,6 @@ export const getAllSubjects = async (req, res) => {
             attributes: ["suId", "subject"],
             order: [["suId", "ASC"]]
         });
-        
         res.status(200).json({
             success: true,
             message: "Lấy danh sách môn học thành công",

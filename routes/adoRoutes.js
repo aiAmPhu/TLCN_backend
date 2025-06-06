@@ -8,4 +8,5 @@ router.post("/add", authenticate, authorizeRoles("admin"), addAdObject);
 router.get("/getall", authenticate, getAllAdObjects); // Removed admin role requirement for reading
 router.put("/update/:id", authenticate, authorizeRoles("admin"), updateAdObject);
 router.delete("/delete/:id", authenticate, authorizeRoles("admin"), deleteAdObject);
-export default router;
+export default router; 
+
