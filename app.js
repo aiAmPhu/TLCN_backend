@@ -21,6 +21,7 @@ import chatRoutes from "./routes/chatRoutes.js";
 import statisticsSnapshotRoutes from "./routes/statisticsSnapshotRoutes.js";
 import notificationRoutes from './routes/notificationRoutes.js';
 import authRoutes from './routes/authRoutes.js';
+import subjectRoutes from './routes/subjectRoutes.js';
 import passport from './config/passport.js';
 
 dotenv.config();
@@ -51,5 +52,6 @@ app.use("/api/chat", chatRoutes);
 app.use("/api/snapshots", statisticsSnapshotRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/subjects', subjectRoutes);
 
 export default app;
