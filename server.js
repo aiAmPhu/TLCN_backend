@@ -43,4 +43,5 @@ const syncDB = async () => {
         process.exit(1);
     }
 };
+
 syncDB();
