@@ -36,4 +36,5 @@ const seedSubjects = async () => {
     }
 };
 
+
 export default seedSubjects; 
