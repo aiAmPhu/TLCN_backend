@@ -72,7 +72,7 @@ const AdmissionWishes = sequelize.define(
         indexes: [
             {
                 unique: true,
-                fields: ["criteriaId", "majorId", "uId"],
+                fields: ["criteriaId", "majorId", "admissionBlockId", "uId"], // Một user có thể đăng ký nhiều nguyện vọng miễn là ít nhất 1 trong 3 khác nhau
             },
         ],
     }

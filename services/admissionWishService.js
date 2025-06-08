@@ -346,12 +346,12 @@ export const addAdmissionWish = async (data) => {
     if (!major || !major.majorCombination.includes(admissionBlockId)) {
         throw new ApiError(400, "Khối xét tuyển không phù hợp với ngành đã chọn");
     }
-    // Kiểm tra duplicate
+    // Kiểm tra duplicate theo unique constraint (criteriaId, majorId, admissionBlockId, uId)
     const existingWish = await AdmissionWishes.findOne({
         where: { uId, criteriaId, majorId, admissionBlockId },
     });
     if (existingWish) {
-        throw new ApiError(400, "Nguyện vọng này đã tồn tại");
+        throw new ApiError(400, "Nguyện vọng này đã tồn tại (cùng ngành, diện, khối)");
     }
     const lastWish = await AdmissionWishes.findOne({ order: [["wishId", "DESC"]], attributes: ["wishId"] });
     const newWishId = lastWish ? lastWish.wishId + 1 : 1;

@@ -11,8 +11,19 @@ import {
     getAllYears,
 } from "../controllers/adwController.js";
 import { authenticate, authorizeRoles } from "../middleware/authMiddleware.js";
+import AdmissionWishes from "../models/admissionWishes.js";
 
 const router = express.Router();
+
+// Temporary route to sync database schema - REMOVE after use
+router.get("/sync-db", async (req, res) => {
+    try {
+        await AdmissionWishes.sync({ alter: true });
+        res.json({ message: "Database schema updated successfully" });
+    } catch (error) {
+        res.status(500).json({ message: "Error syncing database", error: error.message });
+    }
+});
 
 router.post("/add", authenticate, authorizeRoles("user", "admin"), addAdmissionWish);
 router.get("/getAll/:uId", authenticate, authorizeRoles("user"), getAllWishesByUID);
