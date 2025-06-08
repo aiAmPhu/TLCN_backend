@@ -105,18 +105,25 @@ export const resetPassword = async (req, res) => {
 export const getUsersForReviewer = async (req, res) => {
     try {
         const reviewerUserId = req.user.userId;
-        // Lấy reviewer info để trả về majorGroup
+        // Lấy reviewer info để verify role
         const reviewer = await User.findByPk(reviewerUserId);
         if (!reviewer) {
             return res.status(404).json({ message: "Reviewer không tồn tại" });
         }
-        // Lấy users qua admissionWishService
-        const users = await admissionWishService.getWishesByReviewerPermission(reviewerUserId);
+        
+        // Kiểm tra role reviewer
+        if (reviewer.role !== 'reviewer' && reviewer.role !== 'admin') {
+            return res.status(403).json({ message: "Bạn không có quyền reviewer" });
+        }
+        
+        // Reviewer có thể duyệt tất cả hồ sơ, lấy toàn bộ users với admission wishes
+        const users = await admissionWishService.getAllUsersWithWishes();
+        
         res.status(200).json({
             message: "Lấy danh sách người dùng thành công",
             data: {
                 users: users,
-                reviewerMajors: reviewer.majorGroup || [],
+                reviewerMajors: [], // Không cần majorGroup nữa vì reviewer duyệt tất cả
             },
         });
     } catch (error) {

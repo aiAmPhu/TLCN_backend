@@ -26,5 +26,5 @@ router.post("/sendOTP", sendOTP);
 router.post("/verifyOTP", verifyOTP);
 router.post("/send-otp-reset", sendOTPForReset);
 router.post("/reset-password", resetPassword);
-router.get("/getForReviewer", authenticate, authorizeRoles("reviewer"), getUsersForReviewer);
+router.get("/getForReviewer", authenticate, authorizeRoles("reviewer", "admin"), getUsersForReviewer);
 export default router;

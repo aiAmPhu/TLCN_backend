@@ -646,3 +646,35 @@ export const getWishesByReviewerPermission = async (reviewerUserId) => {
     });
     return users; // Trả về danh sách users thay vì wishes
 };
+
+export const getAllUsersWithWishes = async () => {
+    try {
+        // Lấy tất cả wishes để tìm unique userIds
+        const wishes = await AdmissionWishes.findAll({
+            attributes: ["uId"],
+            raw: true,
+        });
+        
+        if (wishes.length === 0) {
+            return [];
+        }
+        
+        // Lấy unique userIds từ wishes
+        const userIds = [...new Set(wishes.map((wish) => wish.uId))];
+        
+        // Lấy thông tin user
+        const users = await User.findAll({
+            where: {
+                userId: {
+                    [Op.in]: userIds,
+                },
+            },
+            attributes: ["userId", "name", "email"],
+        });
+        
+        return users;
+    } catch (error) {
+        console.error("Error in getAllUsersWithWishes:", error);
+        throw new ApiError(500, "Lỗi khi lấy danh sách người dùng có nguyện vọng");
+    }
+};

@@ -3,9 +3,9 @@ import * as permissionService from "../services/permissionService.js";
 export const updatePermission = async (req, res) => {
     try {
         const { userId } = req.params;
-        const { majorGroup } = req.body;
+        const { role } = req.body;
 
-        const result = await permissionService.updatePermission(userId, majorGroup);
+        const result = await permissionService.updatePermission(userId, role);
         res.json(result);
     } catch (error) {
         console.error("Error updating permissions:", error);
