@@ -649,25 +649,10 @@ export const getWishesByReviewerPermission = async (reviewerUserId) => {
 
 export const getAllUsersWithWishes = async () => {
     try {
-        // Lấy tất cả wishes để tìm unique userIds
-        const wishes = await AdmissionWishes.findAll({
-            attributes: ["uId"],
-            raw: true,
-        });
-        
-        if (wishes.length === 0) {
-            return [];
-        }
-        
-        // Lấy unique userIds từ wishes
-        const userIds = [...new Set(wishes.map((wish) => wish.uId))];
-        
-        // Lấy thông tin user
+        // Lấy tất cả users để reviewer có thể xét duyệt tất cả hồ sơ (kể cả chưa có nguyện vọng)
         const users = await User.findAll({
             where: {
-                userId: {
-                    [Op.in]: userIds,
-                },
+                role: 'user' // Chỉ lấy user thường, không lấy admin/reviewer
             },
             attributes: ["userId", "name", "email"],
         });
@@ -675,6 +660,6 @@ export const getAllUsersWithWishes = async () => {
         return users;
     } catch (error) {
         console.error("Error in getAllUsersWithWishes:", error);
-        throw new ApiError(500, "Lỗi khi lấy danh sách người dùng có nguyện vọng");
+        throw new ApiError(500, "Lỗi khi lấy danh sách người dùng");
     }
 };
