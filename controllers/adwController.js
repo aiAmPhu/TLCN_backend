@@ -156,29 +156,33 @@ export const exportWishesToPDF = async (req, res) => {
             });
         }
         
-        try {
-            const pdfBuffer = await admissionWishService.exportWishesToPDF(userId);
-            
-            res.setHeader('Content-Type', 'application/pdf');
-            res.setHeader('Content-Disposition', `attachment; filename="phieu-dang-ky-nguyen-vong-${userId}.pdf"`);
-            res.setHeader('Content-Length', pdfBuffer.length);
-            
-            res.send(pdfBuffer);
-        } catch (pdfError) {
-            console.error('PDF creation failed, trying HTML fallback:', pdfError.message);
-            
-            // If PDF creation fails, return HTML instead
-            const htmlContent = await admissionWishService.exportWishesToHTML(userId);
-            
-            res.setHeader('Content-Type', 'text/html; charset=utf-8');
-            res.setHeader('Content-Disposition', `inline; filename="phieu-dang-ky-nguyen-vong-${userId}.html"`);
-            
-            res.send(htmlContent);
-        }
+        // Only create PDF, no HTML fallback
+        console.log('Creating PDF for user:', userId);
+        const pdfBuffer = await admissionWishService.exportWishesToPDF(userId);
+        
+        // Set headers for PDF response
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="phieu-dang-ky-nguyen-vong-${userId}.pdf"`);
+        res.setHeader('Content-Length', pdfBuffer.length);
+        res.setHeader('Cache-Control', 'no-cache');
+        
+        console.log('PDF export successful for user:', userId, 'Size:', pdfBuffer.length, 'bytes');
+        res.send(pdfBuffer);
+        
     } catch (error) {
-        console.error('Export error:', error);
-        res.status(error.statusCode || 500).json({
-            message: error.message || "Đã xảy ra lỗi khi xuất phiếu đăng ký.",
+        console.error('PDF export failed:', {
+            userId: req.params.userId,
+            error: error.message,
+            stack: error.stack
+        });
+        
+        // Return specific error message without HTML fallback
+        const statusCode = error.statusCode || 500;
+        const message = error.message || "Không thể tạo file PDF. Vui lòng thử lại sau hoặc liên hệ hỗ trợ.";
+        
+        res.status(statusCode).json({
+            message: message,
+            error: "PDF_GENERATION_FAILED"
         });
     }
 };

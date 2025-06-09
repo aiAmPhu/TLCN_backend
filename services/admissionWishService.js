@@ -16,7 +16,7 @@ import { Op } from "sequelize";
 import sequelize from "../config/db.js";
 import { ApiError } from "../utils/ApiError.js";
 import * as statisticsSnapshotService from "./statisticsSnapshotService.js";
-import htmlPdf from 'html-pdf';
+import puppeteer from 'puppeteer';
 
 export const getFilteredWishesForAdmin = async (filterConditions) => {
     try {
@@ -1119,73 +1119,260 @@ export const exportWishesToPDF = async (userId) => {
     </html>
     `;
 
-    // Convert HTML to PDF using html-pdf
-    try {
-        const options = {
-            format: 'A4',
-            orientation: 'portrait',
-            border: {
-                top: '20mm',
-                right: '15mm',
-                bottom: '20mm',
-                left: '15mm'
-            },
-            type: 'pdf',
-            quality: '75',
-            dpi: 96,
-            timeout: 60000, // Increase timeout to 60 seconds
-            zoomFactor: 1,
-            phantomArgs: [
-                '--web-security=false',
-                '--local-to-remote-url-access=true',
-                '--ignore-ssl-errors=true',
-                '--load-images=no', // Disable images for faster rendering
-                '--disk-cache=false' // Disable disk cache
-            ]
-        };
-        
-        console.log('Starting PDF creation for user:', userId);
-        
-        // Create PDF buffer using Promise wrapper
-        const pdfBuffer = await new Promise((resolve, reject) => {
-            try {
-                htmlPdf.create(htmlTemplate, options).toBuffer((err, buffer) => {
-                    if (err) {
-                        console.error('PDF creation error details:', {
-                            message: err.message,
-                            stack: err.stack,
-                            phantomPath: err.phantomPath || 'not available'
-                        });
-                        reject(new Error(`PDF creation failed: ${err.message}`));
-                    } else {
-                        console.log('PDF created successfully, buffer size:', buffer.length);
-                        resolve(buffer);
-                    }
-                });
-            } catch (creationError) {
-                console.error('Error during PDF creation setup:', creationError);
-                reject(creationError);
+    // Use Puppeteer to create PDF with retry logic
+    let browser = null;
+    let retries = 3; // Giảm xuống 3 lần để debug dễ hơn
+    
+    while (retries > 0) {
+        try {
+            console.log(`Starting PDF creation attempt ${4 - retries} for user:`, userId);
+            
+            // Simple browser launch configuration
+            browser = await puppeteer.launch({
+                headless: 'new',
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-gpu',
+                    '--disable-web-security'
+                ],
+                timeout: 60000
+            });
+            
+            const page = await browser.newPage();
+            
+            // Set viewport for consistent rendering
+            await page.setViewport({ 
+                width: 1024, 
+                height: 1448
+            });
+            
+            // Set content
+            await page.setContent(htmlTemplate, { 
+                waitUntil: 'domcontentloaded',
+                timeout: 60000 
+            });
+            
+            // Wait for content to load
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            // Generate PDF
+            const pdfBuffer = await page.pdf({
+                format: 'A4',
+                printBackground: true,
+                margin: {
+                    top: '20mm',
+                    right: '15mm',
+                    bottom: '20mm',
+                    left: '15mm'
+                }
+            });
+            
+            console.log('PDF created successfully, buffer size:', pdfBuffer.length);
+            
+            // Validate PDF buffer
+            if (!pdfBuffer || pdfBuffer.length === 0) {
+                throw new Error('PDF buffer is empty');
             }
-        });
-        
-        return pdfBuffer;
-        
-    } catch (error) {
-        console.error('PDF export error details:', {
-            message: error.message,
-            stack: error.stack,
-            name: error.name
-        });
-        
-        // More specific error messages
-        if (error.message && error.message.includes('phantomjs')) {
-            throw new ApiError(500, `Lỗi hệ thống PDF: PhantomJS không khả dụng. Vui lòng liên hệ quản trị viên.`);
-        } else if (error.message && error.message.includes('timeout')) {
-            throw new ApiError(500, `Quá thời gian tạo PDF. Vui lòng thử lại sau.`);
-        } else if (error.message && error.message.includes('Cannot find module')) {
-            throw new ApiError(500, `Thiếu thư viện tạo PDF. Vui lòng liên hệ quản trị viên.`);
-        } else {
-            throw new ApiError(500, `Lỗi khi tạo file PDF: ${error.message || 'Unknown error'}. Vui lòng thử lại sau hoặc liên hệ hỗ trợ.`);
+            
+            // Success
+            return pdfBuffer;
+            
+        } catch (error) {
+            retries--;
+            console.error(`PDF creation attempt failed (${retries} retries left):`, {
+                message: error.message,
+                name: error.name
+            });
+            
+            if (retries === 0) {
+                console.error('All PDF creation attempts failed for user:', userId);
+                throw new ApiError(500, `Không thể tạo file PDF. Lỗi: ${error.message}. Vui lòng thử lại sau.`);
+            } else {
+                // Wait before retry
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        } finally {
+            // Always close the browser
+            if (browser) {
+                try {
+                    await browser.close();
+                    console.log('Browser closed successfully');
+                } catch (closeError) {
+                    console.error('Error closing browser:', closeError);
+                }
+                browser = null;
+            }
         }
     }
+};
+
+// Create simple HTML response as fallback
+const createSimpleHTMLResponse = (user, wishes) => {
+    return `
+    <!DOCTYPE html>
+    <html lang="vi">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Phiếu Đăng Ký Nguyện Vọng Xét Tuyển</title>
+        <style>
+            body {
+                font-family: 'Times New Roman', serif;
+                font-size: 14px;
+                line-height: 1.6;
+                margin: 20px;
+                color: #333;
+                background: white;
+            }
+            .header {
+                text-align: center;
+                margin-bottom: 30px;
+                border-bottom: 2px solid #000;
+                padding-bottom: 20px;
+            }
+            .title {
+                font-size: 24px;
+                font-weight: bold;
+                text-transform: uppercase;
+                color: #1a365d;
+                margin: 10px 0;
+            }
+            .subtitle {
+                font-size: 16px;
+                margin-bottom: 20px;
+            }
+            .info-section {
+                margin: 20px 0;
+                padding: 15px;
+                border: 1px solid #ddd;
+                background-color: #f9f9f9;
+            }
+            .info-section h3 {
+                color: #1a365d;
+                border-bottom: 1px solid #1a365d;
+                padding-bottom: 5px;
+            }
+            .wishes-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin: 20px 0;
+            }
+            .wishes-table th,
+            .wishes-table td {
+                border: 1px solid #ddd;
+                padding: 10px;
+                text-align: left;
+            }
+            .wishes-table th {
+                background-color: #1a365d;
+                color: white;
+                font-weight: bold;
+            }
+            .wishes-table tr:nth-child(even) {
+                background-color: #f2f2f2;
+            }
+            .priority {
+                text-align: center;
+                font-weight: bold;
+                color: #d63384;
+            }
+            .score {
+                text-align: center;
+                font-weight: bold;
+                color: #198754;
+            }
+            .footer {
+                margin-top: 40px;
+                text-align: center;
+                font-size: 12px;
+                color: #666;
+                border-top: 1px solid #ddd;
+                padding-top: 20px;
+            }
+            @media print {
+                body { margin: 0; }
+                .header { border-bottom: 3px double #000; }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <div style="font-weight: bold;">BỘ GIÁO DỤC VÀ ĐÀO TẠO</div>
+            <div style="font-weight: bold; font-size: 18px;">TRƯỜNG ĐẠI HỌC SƯ PHẠM KỸ THUẬT TP.HCM</div>
+            <div class="title">Phiếu Đăng Ký Nguyện Vọng Xét Tuyển</div>
+            <div class="subtitle">Năm học ${new Date().getFullYear()}-${new Date().getFullYear() + 1}</div>
+        </div>
+
+        <div class="info-section">
+            <h3>I. Thông tin thí sinh</h3>
+            <p><strong>Họ và tên:</strong> ${user.name || 'Chưa cập nhật'}</p>
+            <p><strong>Email:</strong> ${user.email || 'Chưa cập nhật'}</p>
+            <p><strong>Mã thí sinh:</strong> ${user.userId}</p>
+            <p><strong>Ngày đăng ký:</strong> ${new Date().toLocaleDateString('vi-VN')}</p>
+            <p><strong>Tổng số nguyện vọng:</strong> ${wishes.length}</p>
+        </div>
+
+        <div class="info-section">
+            <h3>II. Danh sách nguyện vọng</h3>
+            <table class="wishes-table">
+                <thead>
+                    <tr>
+                        <th style="width: 50px;">STT</th>
+                        <th style="width: 80px;">Thứ tự ưu tiên</th>
+                        <th>Ngành đăng ký</th>
+                        <th>Diện xét tuyển</th>
+                        <th>Khối xét tuyển</th>
+                        <th style="width: 100px;">Điểm xét tuyển</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${wishes.map((wish, index) => {
+                        const wishData = wish.get ? wish.get({ plain: true }) : wish;
+                        return `
+                            <tr>
+                                <td style="text-align: center;">${index + 1}</td>
+                                <td class="priority">${wishData.priority}</td>
+                                <td>
+                                    <strong>${wishData.AdmissionMajor?.majorName || wishData.majorId}</strong><br>
+                                    <small style="color: #666;">Mã ngành: ${wishData.majorId}</small>
+                                </td>
+                                <td>${wishData.AdmissionCriterium?.criteriaName || wishData.criteriaId}</td>
+                                <td>
+                                    ${wishData.AdmissionBlock?.admissionBlockName || wishData.admissionBlockId}
+                                    <br><small>(${wishData.admissionBlockId})</small>
+                                </td>
+                                <td class="score">${wishData.scores ? wishData.scores.toFixed(2) : '---'}</td>
+                            </tr>
+                        `;
+                    }).join('')}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="info-section">
+            <h3>III. Cam đoan</h3>
+            <p style="text-align: justify;">
+                Tôi xin cam đoan rằng tất cả các thông tin đã khai trong phiếu đăng ký này là đúng sự thật. 
+                Nếu có sai sót, tôi xin hoàn toàn chịu trách nhiệm và chấp nhận mọi hình thức xử lý của nhà trường 
+                theo quy định hiện hành.
+            </p>
+            <div style="margin-top: 40px; text-align: right;">
+                <p><em>TP.Hồ Chí Minh, ngày ${new Date().getDate()} tháng ${new Date().getMonth() + 1} năm ${new Date().getFullYear()}</em></p>
+                <p style="margin-top: 20px;"><strong>Thí sinh</strong></p>
+                <p style="margin-top: 60px; border-top: 1px solid #000; display: inline-block; padding-top: 5px;">
+                    <strong>${user.name || '(Ký và ghi rõ họ tên)'}</strong>
+                </p>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p><strong>Ghi chú:</strong> Phiếu đăng ký này có giá trị pháp lý</p>
+            <p>Liên hệ: (028) 3896 7641 - Email: tuyensinh@hcmute.edu.vn</p>
+            <p><em>Phiếu được tạo tự động từ hệ thống vào lúc ${new Date().toLocaleString('vi-VN')}</em></p>
+        </div>
+    </body>
+    </html>
+    `;
 };
