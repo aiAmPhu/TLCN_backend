@@ -9,6 +9,8 @@ import {
     getFilterOptions,
     getWishFormData,
     getAllYears,
+    deleteAdmissionWish,
+    exportWishesToPDF,
 } from "../controllers/adwController.js";
 import { authenticate, authorizeRoles } from "../middleware/authMiddleware.js";
 import AdmissionWishes from "../models/admissionWishes.js";
@@ -34,4 +36,9 @@ router.get("/getFilteredAccepted", authenticate, authorizeRoles("admin"), getFil
 router.get("/getFilterOptions", authenticate, authorizeRoles("admin"), getFilterOptions);
 router.get("/form-data", authenticate, authorizeRoles("user", "admin"), getWishFormData);
 router.get("/years", authenticate, authorizeRoles("user", "admin"), getAllYears);
+
+// New routes for delete and PDF export
+router.delete("/delete/:wishId", authenticate, authorizeRoles("user", "admin"), deleteAdmissionWish);
+router.get("/export-pdf/:userId", authenticate, authorizeRoles("user", "admin"), exportWishesToPDF);
+
 export default router;

@@ -663,3 +663,472 @@ export const getAllUsersWithWishes = async () => {
         throw new ApiError(500, "Lỗi khi lấy danh sách người dùng");
     }
 };
+
+// New service functions for delete and PDF export
+export const deleteAdmissionWish = async (wishId, userId, userRole) => {
+    if (!wishId) {
+        throw new ApiError(400, "Thiếu wishId.");
+    }
+
+    // Find the wish to delete
+    const wish = await AdmissionWishes.findByPk(wishId);
+    if (!wish) {
+        throw new ApiError(404, "Không tìm thấy nguyện vọng.");
+    }
+
+    // Check permission: user can only delete their own wishes, admin can delete any
+    if (userRole !== 'admin' && wish.uId !== userId) {
+        throw new ApiError(403, "Bạn không có quyền xóa nguyện vọng này.");
+    }
+
+    // Check if wish is already accepted
+    if (wish.status === 'accepted') {
+        throw new ApiError(400, "Không thể xóa nguyện vọng đã được chấp nhận.");
+    }
+
+    // Get all wishes of the user to update priorities
+    const userWishes = await AdmissionWishes.findAll({
+        where: { uId: wish.uId },
+        order: [["priority", "ASC"]],
+    });
+
+    // Delete the wish
+    await AdmissionWishes.destroy({
+        where: { wishId },
+    });
+
+    // Update priorities of remaining wishes
+    const remainingWishes = userWishes.filter(w => w.wishId !== parseInt(wishId));
+    const updatePromises = remainingWishes.map((w, index) => {
+        const newPriority = index + 1;
+        if (w.priority !== newPriority) {
+            return AdmissionWishes.update(
+                { priority: newPriority },
+                { where: { wishId: w.wishId } }
+            );
+        }
+        return Promise.resolve();
+    });
+
+    await Promise.all(updatePromises);
+
+    return {
+        message: "Xóa nguyện vọng thành công.",
+        deletedWishId: wishId,
+    };
+};
+
+export const exportWishesToPDF = async (userId) => {
+    if (!userId) {
+        throw new ApiError(400, "Thiếu userId.");
+    }
+
+    // Get user information
+    const user = await User.findByPk(userId);
+    if (!user) {
+        throw new ApiError(404, "Không tìm thấy người dùng.");
+    }
+
+    // Get user's wishes with related information
+    const wishes = await AdmissionWishes.findAll({
+        where: { uId: userId },
+        include: [
+            {
+                model: AdmissionMajor,
+                attributes: ["majorId", "majorName"],
+            },
+            {
+                model: AdmissionCriteria,
+                attributes: ["criteriaId", "criteriaName"],
+            },
+            {
+                model: AdmissionBlocks,
+                attributes: ["admissionBlockId", "admissionBlockName"],
+            },
+        ],
+        order: [["priority", "ASC"]],
+    });
+
+    if (wishes.length === 0) {
+        throw new ApiError(404, "Người dùng chưa đăng ký nguyện vọng nào.");
+    }
+
+    // Create HTML template for PDF
+    const htmlTemplate = `
+    <!DOCTYPE html>
+    <html lang="vi">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Phiếu Đăng Ký Nguyện Vọng Xét Tuyển</title>
+        <style>
+            @page {
+                margin: 20mm;
+                size: A4;
+            }
+            body {
+                font-family: 'Times New Roman', serif;
+                font-size: 13px;
+                line-height: 1.4;
+                margin: 0;
+                padding: 0;
+                color: #000;
+                background: white;
+            }
+            .document-header {
+                text-align: center;
+                margin-bottom: 25px;
+                padding-bottom: 15px;
+                border-bottom: 3px double #000;
+            }
+            .ministry-info {
+                font-size: 12px;
+                font-weight: bold;
+                margin-bottom: 3px;
+                text-transform: uppercase;
+            }
+            .university-main {
+                font-size: 14px;
+                font-weight: bold;
+                margin-bottom: 3px;
+                text-transform: uppercase;
+            }
+            .university-english {
+                font-size: 11px;
+                font-style: italic;
+                margin-bottom: 8px;
+            }
+            .document-number {
+                font-size: 11px;
+                margin-bottom: 15px;
+            }
+            .form-title {
+                font-size: 18px;
+                font-weight: bold;
+                text-transform: uppercase;
+                margin: 15px 0;
+                letter-spacing: 1px;
+            }
+            .form-subtitle {
+                font-size: 14px;
+                margin-bottom: 10px;
+                font-style: italic;
+            }
+            .academic-year {
+                font-size: 13px;
+                font-weight: bold;
+                margin-bottom: 20px;
+            }
+            .content-section {
+                margin-bottom: 20px;
+            }
+            .section-title {
+                font-size: 14px;
+                font-weight: bold;
+                margin-bottom: 10px;
+                text-transform: uppercase;
+                background-color: #f5f5f5;
+                padding: 8px 12px;
+                border-left: 4px solid #1a365d;
+            }
+            .info-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-bottom: 15px;
+            }
+            .info-table td {
+                padding: 8px 12px;
+                border: 1px solid #ccc;
+                vertical-align: top;
+            }
+            .info-label {
+                background-color: #f8f9fa;
+                font-weight: bold;
+                width: 35%;
+                text-align: left;
+            }
+            .info-value {
+                background-color: white;
+                border-bottom: 1px dotted #999;
+                min-height: 20px;
+            }
+            .wishes-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin: 15px 0;
+                font-size: 12px;
+            }
+            .wishes-table th {
+                background-color: #1a365d;
+                color: white;
+                padding: 10px 6px;
+                text-align: center;
+                font-weight: bold;
+                border: 1px solid #000;
+                font-size: 11px;
+            }
+            .wishes-table td {
+                padding: 8px 6px;
+                border: 1px solid #666;
+                text-align: center;
+                vertical-align: middle;
+            }
+            .wishes-table tbody tr:nth-child(odd) {
+                background-color: #fafafa;
+            }
+            .priority-col {
+                background-color: #fff3cd !important;
+                font-weight: bold;
+                font-size: 13px;
+            }
+            .major-col {
+                text-align: left !important;
+                padding-left: 8px !important;
+            }
+            .major-name {
+                font-weight: bold;
+                display: block;
+                margin-bottom: 2px;
+            }
+            .major-code {
+                font-size: 10px;
+                color: #666;
+                font-style: italic;
+            }
+            .score-col {
+                font-weight: bold;
+                color: #1a365d;
+            }
+            .status-official {
+                padding: 3px 8px;
+                border-radius: 3px;
+                font-size: 10px;
+                font-weight: bold;
+                text-transform: uppercase;
+                border: 1px solid;
+            }
+            .status-waiting {
+                background-color: #fff3cd;
+                color: #856404;
+                border-color: #ffeaa7;
+            }
+            .status-accepted {
+                background-color: #d1e7dd;
+                color: #0f5132;
+                border-color: #badbcc;
+            }
+            .status-rejected {
+                background-color: #f8d7da;
+                color: #842029;
+                border-color: #f5c2c7;
+            }
+            .declaration-section {
+                margin-top: 25px;
+                padding: 15px;
+                border: 2px solid #1a365d;
+                background-color: #f8f9fa;
+            }
+            .declaration-title {
+                font-weight: bold;
+                text-align: center;
+                margin-bottom: 10px;
+                text-transform: uppercase;
+                font-size: 13px;
+            }
+            .declaration-text {
+                text-align: justify;
+                font-size: 12px;
+                line-height: 1.5;
+                margin-bottom: 10px;
+            }
+            .signature-section {
+                margin-top: 30px;
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+            }
+            .signature-box {
+                text-align: center;
+                width: 220px;
+            }
+            .signature-date {
+                font-size: 12px;
+                margin-bottom: 5px;
+            }
+            .signature-title {
+                font-weight: bold;
+                margin-bottom: 60px;
+                font-size: 13px;
+                text-transform: uppercase;
+            }
+            .signature-name {
+                border-top: 1px solid #000;
+                padding-top: 5px;
+                font-weight: bold;
+            }
+            .footer-note {
+                font-size: 10px;
+                font-style: italic;
+                color: #666;
+                text-align: left;
+            }
+            .page-break {
+                page-break-before: always;
+            }
+            .watermark {
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%) rotate(-45deg);
+                font-size: 48px;
+                color: rgba(0, 0, 0, 0.05);
+                z-index: -1;
+                font-weight: bold;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="watermark">HCMUTE</div>
+        
+        <div class="document-header">
+            <div class="ministry-info">BỘ GIÁO DỤC VÀ ĐÀO TẠO</div>
+            <div class="university-main">TRƯỜNG ĐẠI HỌC SƯ PHẠM KỸ THUẬT TP.HCM</div>
+            <div class="university-english">HO CHI MINH CITY UNIVERSITY OF TECHNOLOGY AND EDUCATION</div>
+            <div class="document-number">Số: ........./ĐKXTNV-${new Date().getFullYear()}</div>
+            
+            <div class="form-title">PHIẾU ĐĂNG KÝ NGUYỆN VỌNG XÉT TUYỂN</div>
+            <div class="form-subtitle">Admission Application Form</div>
+            <div class="academic-year">NĂM HỌC ${new Date().getFullYear()}-${new Date().getFullYear() + 1}</div>
+        </div>
+
+        <div class="content-section">
+            <div class="section-title">I. THÔNG TIN THÍ SINH</div>
+            <table class="info-table">
+                <tr>
+                    <td class="info-label">Họ và tên thí sinh:</td>
+                    <td class="info-value">${user.name || '.............................'}</td>
+                    <td class="info-label">Mã số thí sinh:</td>
+                    <td class="info-value">${userId}</td>
+                </tr>
+                <tr>
+                    <td class="info-label">Email:</td>
+                    <td class="info-value">${user.email || '.............................'}</td>
+                    <td class="info-label">Ngày đăng ký:</td>
+                    <td class="info-value">${new Date().toLocaleDateString('vi-VN')}</td>
+                </tr>
+                <tr>
+                    <td class="info-label">Số điện thoại:</td>
+                    <td class="info-value">...............................</td>
+                    <td class="info-label">Tổng số nguyện vọng:</td>
+                    <td class="info-value"><strong>${wishes.length}</strong></td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="content-section">
+            <div class="section-title">II. DANH SÁCH NGUYỆN VỌNG XÉT TUYỂN</div>
+            <table class="wishes-table">
+                <thead>
+                    <tr>
+                        <th style="width: 8%">STT</th>
+                        <th style="width: 10%">Thứ tự<br>ưu tiên</th>
+                        <th style="width: 40%">Ngành đăng ký</th>
+                        <th style="width: 20%">Diện xét tuyển</th>
+                        <th style="width: 20%">Khối xét tuyển</th>
+                        <th style="width: 12%">Điểm xét<br>tuyển</th>
+                    </tr>
+                </thead>
+                <tbody>
+                                    ${wishes.map((wish, index) => {
+                    const wishData = wish.get ? wish.get({ plain: true }) : wish;
+                        
+                        return `
+                            <tr>
+                                <td>${index + 1}</td>
+                                <td class="priority-col">${wishData.priority}</td>
+                                <td class="major-col">
+                                    <span class="major-name">${wishData.AdmissionMajor?.majorName || wishData.majorId}</span>
+                                    <span class="major-code">Mã ngành: ${wishData.majorId}</span>
+                                </td>
+                                <td>${wishData.AdmissionCriterium?.criteriaName || wishData.criteriaId}</td>
+                                <td>
+                                    ${wishData.AdmissionBlock?.admissionBlockName || wishData.admissionBlockId}<br>
+                                    <small style="font-size: 10px; color: #666;">(${wishData.admissionBlockId})</small>
+                                </td>
+                                <td class="score-col">${wishData.scores ? wishData.scores.toFixed(2) : '---'}</td>
+                            </tr>
+                        `;
+                    }).join('')}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="declaration-section">
+            <div class="declaration-title">CAM ĐOAN</div>
+            <div class="declaration-text">
+                Tôi xin cam đoan rằng tất cả các thông tin đã khai trong phiếu đăng ký này là đúng sự thật. 
+                Nếu có sai sót, tôi xin hoàn toàn chịu trách nhiệm và chấp nhận mọi hình thức xử lý của nhà trường 
+                theo quy định hiện hành.
+            </div>
+            <div class="declaration-text">
+                Tôi đã đọc và hiểu rõ các quy định về xét tuyển của trường và cam kết thực hiện đúng 
+                các quy định này trong suốt quá trình học tập.
+            </div>
+        </div>
+
+        <div class="signature-section">
+            <div class="footer-note">
+                <strong>Ghi chú:</strong><br>
+                - Phiếu đăng ký này có giá trị pháp lý<br>
+                - Liên hệ: (028) 3896 7641 - Email: tuyensinh@hcmute.edu.vn
+            </div>
+            
+            <div class="signature-box">
+                <div class="signature-date">
+                    TP.Hồ Chí Minh, ngày ${new Date().getDate()} tháng ${new Date().getMonth() + 1} năm ${new Date().getFullYear()}
+                </div>
+                <div class="signature-title">Thí sinh</div>
+                <div class="signature-name">
+                    ${user.name || '(Ký và ghi rõ họ tên)'}
+                </div>
+            </div>
+        </div>
+
+        <div style="margin-top: 20px; text-align: center; font-size: 10px; color: #666; border-top: 1px solid #ddd; padding-top: 10px;">
+            <em>Phiếu được tạo tự động từ hệ thống vào lúc ${new Date().toLocaleString('vi-VN')} - Mã số: HCMUTE-${userId}-${Date.now().toString().slice(-6)}</em>
+        </div>
+    </body>
+    </html>
+    `;
+
+    // Convert HTML to PDF using puppeteer (you'll need to install puppeteer)
+    try {
+        const puppeteer = await import('puppeteer');
+        const browser = await puppeteer.default.launch({
+            headless: 'new',
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
+        });
+        
+        const page = await browser.newPage();
+        await page.setContent(htmlTemplate, { waitUntil: 'networkidle0' });
+        
+        const pdfBuffer = await page.pdf({
+            format: 'A4',
+            margin: {
+                top: '20mm',
+                bottom: '20mm',
+                left: '15mm',
+                right: '15mm'
+            },
+            printBackground: true,
+            preferCSSPageSize: true
+        });
+        
+        await browser.close();
+        return pdfBuffer;
+        
+    } catch (error) {
+        console.error('Puppeteer error:', error);
+        throw new ApiError(500, "Lỗi khi tạo file PDF. Vui lòng thử lại sau.");
+    }
+};

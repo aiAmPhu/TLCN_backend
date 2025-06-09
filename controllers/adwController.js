@@ -1,5 +1,6 @@
 import * as admissionWishService from "../services/admissionWishService.js";
 import AdmissionYear from "../models/admissionYear.js";
+
 export const getAllYears = async (req, res) => {
     try {
         const years = await AdmissionYear.findAll({
@@ -17,6 +18,7 @@ export const getAllYears = async (req, res) => {
         });
     }
 };
+
 export const getWishFormData = async (req, res) => {
     try {
         const userId = req.user.userId;
@@ -121,6 +123,49 @@ export const getFilterOptions = async (req, res) => {
     } catch (error) {
         res.status(500).json({
             message: "Lỗi khi lấy options",
+        });
+    }
+};
+
+// New controller functions for delete and PDF export
+export const deleteAdmissionWish = async (req, res) => {
+    try {
+        const { wishId } = req.params;
+        const userId = req.user.userId;
+        const userRole = req.user.role;
+        
+        const result = await admissionWishService.deleteAdmissionWish(wishId, userId, userRole);
+        res.status(200).json(result);
+    } catch (error) {
+        res.status(error.statusCode || 500).json({
+            message: error.message || "Đã xảy ra lỗi khi xóa nguyện vọng.",
+        });
+    }
+};
+
+export const exportWishesToPDF = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const requestUserId = req.user.userId;
+        const userRole = req.user.role;
+        
+        // Check permission: user can only export their own wishes, admin can export any
+        if (userRole !== 'admin' && parseInt(userId) !== requestUserId) {
+            return res.status(403).json({
+                message: "Bạn không có quyền xuất phiếu đăng ký của người khác.",
+            });
+        }
+        
+        const pdfBuffer = await admissionWishService.exportWishesToPDF(userId);
+        
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="phieu-dang-ky-nguyen-vong-${userId}.pdf"`);
+        res.setHeader('Content-Length', pdfBuffer.length);
+        
+        res.send(pdfBuffer);
+    } catch (error) {
+        res.status(error.statusCode || 500).json({
+            message: error.message || "Đã xảy ra lỗi khi xuất phiếu đăng ký PDF.",
         });
     }
 };

@@ -18,7 +18,9 @@ This is the backend API for the University Admission System of Ho Chi Minh City 
 - **Profile Management**: Complete student profile with personal information
 - **Academic Records**: Learning process and transcript management
 - **Photo Upload**: ID photo upload with Cloudinary integration
-- **Admission Wishes**: Multiple major preference registration
+- **Admission Wishes**: Multiple major preference registration with CRUD operations
+- **Wish Management**: Add, update, delete, and view admission wishes
+- **PDF Export**: Export admission wish registration form to PDF
 
 ### 👩‍💼 Reviewer Features:
 - **Application Review**: Review and approve/reject student applications
@@ -61,6 +63,11 @@ This is the backend API for the University Admission System of Ho Chi Minh City 
 - **Multer 1.4.5**: Multipart form data handling
 - **Cloudinary 1.41.3**: Cloud-based image and video management
 - **Multer Storage Cloudinary**: Cloudinary storage engine for Multer
+
+### PDF Generation:
+- **Puppeteer**: Headless Chrome for PDF generation
+- **HTML-PDF**: Convert HTML templates to PDF documents
+- **PDFKit**: JavaScript PDF generation library
 
 ### Email & Communication:
 - **Nodemailer 7.0.2**: Email sending capability
@@ -319,11 +326,17 @@ DELETE /api/adis/:userId            # Delete admission info
 
 ### Admission Wishes (`/api/wish/`)
 ```
-GET    /api/wish/:userId            # Get user's wishes
-POST   /api/wish                    # Submit admission wishes
-PUT    /api/wish/:id                # Update wish
-DELETE /api/wish/:id                # Delete wish
-GET    /api/wish/all                # Get all wishes (reviewer/admin)
+GET    /api/wish/form-data          # Get wish form data with validation
+POST   /api/wish/add                # Submit admission wishes
+DELETE /api/wish/delete/:wishId     # Delete specific wish
+GET    /api/wish/getAll/:uId        # Get all wishes by user ID
+GET    /api/wish/getAccepted        # Get accepted wishes (admin)
+GET    /api/wish/export-pdf/:userId # Export user's wishes to PDF
+PUT    /api/wish/filter             # Filter admission results (admin)
+PUT    /api/wish/resetStatus        # Reset all wishes status (admin)
+GET    /api/wish/getFilteredAccepted # Get filtered accepted wishes
+GET    /api/wish/getFilterOptions   # Get filter options
+GET    /api/wish/years              # Get admission years
 ```
 
 ### Academic Records
