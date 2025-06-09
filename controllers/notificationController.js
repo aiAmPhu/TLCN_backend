@@ -35,6 +35,37 @@ export const markAsRead = async (req, res) => {
     }
 };
 
+// Mark all notifications as read for a user
+export const markAllAsRead = async (req, res) => {
+    try {
+        const userId = parseInt(req.params.userId);
+        
+        // Check if user is authorized to mark their own notifications
+        if (userId !== req.user.userId) {
+            return res.status(403).json({ message: 'Unauthorized' });
+        }
+
+        // Update all unread notifications for this user
+        const [updatedCount] = await Notification.update(
+            { read: true },
+            { 
+                where: { 
+                    userId: userId,
+                    read: false 
+                }
+            }
+        );
+
+        res.json({ 
+            message: 'All notifications marked as read',
+            updatedCount 
+        });
+    } catch (error) {
+        console.error('Error marking all notifications as read:', error);
+        res.status(500).json({ message: 'Error marking all notifications as read' });
+    }
+};
+
 // Create a new notification
 export const createNotification = async (userId, title, message, type = 'message') => {
     try {
