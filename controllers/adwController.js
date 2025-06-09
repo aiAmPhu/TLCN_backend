@@ -156,16 +156,29 @@ export const exportWishesToPDF = async (req, res) => {
             });
         }
         
-        const pdfBuffer = await admissionWishService.exportWishesToPDF(userId);
-        
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="phieu-dang-ky-nguyen-vong-${userId}.pdf"`);
-        res.setHeader('Content-Length', pdfBuffer.length);
-        
-        res.send(pdfBuffer);
+        try {
+            const pdfBuffer = await admissionWishService.exportWishesToPDF(userId);
+            
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename="phieu-dang-ky-nguyen-vong-${userId}.pdf"`);
+            res.setHeader('Content-Length', pdfBuffer.length);
+            
+            res.send(pdfBuffer);
+        } catch (pdfError) {
+            console.error('PDF creation failed, trying HTML fallback:', pdfError.message);
+            
+            // If PDF creation fails, return HTML instead
+            const htmlContent = await admissionWishService.exportWishesToHTML(userId);
+            
+            res.setHeader('Content-Type', 'text/html; charset=utf-8');
+            res.setHeader('Content-Disposition', `inline; filename="phieu-dang-ky-nguyen-vong-${userId}.html"`);
+            
+            res.send(htmlContent);
+        }
     } catch (error) {
+        console.error('Export error:', error);
         res.status(error.statusCode || 500).json({
-            message: error.message || "Đã xảy ra lỗi khi xuất phiếu đăng ký PDF.",
+            message: error.message || "Đã xảy ra lỗi khi xuất phiếu đăng ký.",
         });
     }
 };

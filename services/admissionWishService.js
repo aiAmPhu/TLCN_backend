@@ -16,6 +16,8 @@ import { Op } from "sequelize";
 import sequelize from "../config/db.js";
 import { ApiError } from "../utils/ApiError.js";
 import * as statisticsSnapshotService from "./statisticsSnapshotService.js";
+import htmlPdf from 'html-pdf';
+
 export const getFilteredWishesForAdmin = async (filterConditions) => {
     try {
         const whereCondition = {};
@@ -88,6 +90,7 @@ export const getFilteredWishesForAdmin = async (filterConditions) => {
         throw new ApiError(500, "Lỗi khi lọc nguyện vọng cho admin");
     }
 };
+
 export const getFilterStatistics = async (filterConditions) => {
     try {
         const whereCondition = buildWhereConditionFromFilter(filterConditions);
@@ -167,6 +170,7 @@ export const getFilterStatistics = async (filterConditions) => {
         throw new ApiError(500, "Lỗi khi lấy thống kê filter");
     }
 };
+
 const buildWhereConditionFromFilter = (filterConditions) => {
     const whereCondition = {};
 
@@ -198,6 +202,7 @@ const buildWhereConditionFromFilter = (filterConditions) => {
 
     return whereCondition;
 };
+
 export const getActiveYearWishData = async (userId) => {
     try {
         // Lấy năm active
@@ -718,6 +723,45 @@ export const deleteAdmissionWish = async (wishId, userId, userRole) => {
     };
 };
 
+// HTML fallback export function
+export const exportWishesToHTML = async (userId) => {
+    if (!userId) {
+        throw new ApiError(400, "Thiếu userId.");
+    }
+
+    // Get user information
+    const user = await User.findByPk(userId);
+    if (!user) {
+        throw new ApiError(404, "Không tìm thấy người dùng.");
+    }
+
+    // Get user's wishes with related information
+    const wishes = await AdmissionWishes.findAll({
+        where: { uId: userId },
+        include: [
+            {
+                model: AdmissionMajor,
+                attributes: ["majorId", "majorName"],
+            },
+            {
+                model: AdmissionCriteria,
+                attributes: ["criteriaId", "criteriaName"],
+            },
+            {
+                model: AdmissionBlocks,
+                attributes: ["admissionBlockId", "admissionBlockName"],
+            },
+        ],
+        order: [["priority", "ASC"]],
+    });
+
+    if (wishes.length === 0) {
+        throw new ApiError(404, "Người dùng chưa đăng ký nguyện vọng nào.");
+    }
+
+    return createSimpleHTMLResponse(user, wishes);
+};
+
 export const exportWishesToPDF = async (userId) => {
     if (!userId) {
         throw new ApiError(400, "Thiếu userId.");
@@ -895,29 +939,6 @@ export const exportWishesToPDF = async (userId) => {
                 font-weight: bold;
                 color: #1a365d;
             }
-            .status-official {
-                padding: 3px 8px;
-                border-radius: 3px;
-                font-size: 10px;
-                font-weight: bold;
-                text-transform: uppercase;
-                border: 1px solid;
-            }
-            .status-waiting {
-                background-color: #fff3cd;
-                color: #856404;
-                border-color: #ffeaa7;
-            }
-            .status-accepted {
-                background-color: #d1e7dd;
-                color: #0f5132;
-                border-color: #badbcc;
-            }
-            .status-rejected {
-                background-color: #f8d7da;
-                color: #842029;
-                border-color: #f5c2c7;
-            }
             .declaration-section {
                 margin-top: 25px;
                 padding: 15px;
@@ -977,24 +998,9 @@ export const exportWishesToPDF = async (userId) => {
                 color: #666;
                 text-align: left;
             }
-            .page-break {
-                page-break-before: always;
-            }
-            .watermark {
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%) rotate(-45deg);
-                font-size: 48px;
-                color: rgba(0, 0, 0, 0.05);
-                z-index: -1;
-                font-weight: bold;
-            }
         </style>
     </head>
     <body>
-        <div class="watermark">HCMUTE</div>
-        
         <div class="document-header">
             <div class="ministry-info">BỘ GIÁO DỤC VÀ ĐÀO TẠO</div>
             <div class="university-main">TRƯỜNG ĐẠI HỌC SƯ PHẠM KỸ THUẬT TP.HCM</div>
@@ -1044,8 +1050,8 @@ export const exportWishesToPDF = async (userId) => {
                     </tr>
                 </thead>
                 <tbody>
-                                    ${wishes.map((wish, index) => {
-                    const wishData = wish.get ? wish.get({ plain: true }) : wish;
+                    ${wishes.map((wish, index) => {
+                        const wishData = wish.get ? wish.get({ plain: true }) : wish;
                         
                         return `
                             <tr>
@@ -1113,10 +1119,8 @@ export const exportWishesToPDF = async (userId) => {
     </html>
     `;
 
-    // Convert HTML to PDF using html-pdf (better for Heroku deployment)
+    // Convert HTML to PDF using html-pdf
     try {
-        const pdf = await import('html-pdf');
-        
         const options = {
             format: 'A4',
             orientation: 'portrait',
@@ -1129,31 +1133,59 @@ export const exportWishesToPDF = async (userId) => {
             type: 'pdf',
             quality: '75',
             dpi: 96,
-            timeout: 30000,
+            timeout: 60000, // Increase timeout to 60 seconds
             zoomFactor: 1,
             phantomArgs: [
                 '--web-security=false',
                 '--local-to-remote-url-access=true',
-                '--ignore-ssl-errors=true'
+                '--ignore-ssl-errors=true',
+                '--load-images=no', // Disable images for faster rendering
+                '--disk-cache=false' // Disable disk cache
             ]
         };
         
+        console.log('Starting PDF creation for user:', userId);
+        
         // Create PDF buffer using Promise wrapper
         const pdfBuffer = await new Promise((resolve, reject) => {
-            pdf.default.create(htmlTemplate, options).toBuffer((err, buffer) => {
-                if (err) {
-                    console.error('PDF creation error:', err);
-                    reject(err);
-                } else {
-                    resolve(buffer);
-                }
-            });
+            try {
+                htmlPdf.create(htmlTemplate, options).toBuffer((err, buffer) => {
+                    if (err) {
+                        console.error('PDF creation error details:', {
+                            message: err.message,
+                            stack: err.stack,
+                            phantomPath: err.phantomPath || 'not available'
+                        });
+                        reject(new Error(`PDF creation failed: ${err.message}`));
+                    } else {
+                        console.log('PDF created successfully, buffer size:', buffer.length);
+                        resolve(buffer);
+                    }
+                });
+            } catch (creationError) {
+                console.error('Error during PDF creation setup:', creationError);
+                reject(creationError);
+            }
         });
         
         return pdfBuffer;
         
     } catch (error) {
-        console.error('PDF export error:', error);
-        throw new ApiError(500, `Lỗi khi tạo file PDF: ${error.message}. Vui lòng thử lại sau.`);
+        console.error('PDF export error details:', {
+            message: error.message,
+            stack: error.stack,
+            name: error.name
+        });
+        
+        // More specific error messages
+        if (error.message && error.message.includes('phantomjs')) {
+            throw new ApiError(500, `Lỗi hệ thống PDF: PhantomJS không khả dụng. Vui lòng liên hệ quản trị viên.`);
+        } else if (error.message && error.message.includes('timeout')) {
+            throw new ApiError(500, `Quá thời gian tạo PDF. Vui lòng thử lại sau.`);
+        } else if (error.message && error.message.includes('Cannot find module')) {
+            throw new ApiError(500, `Thiếu thư viện tạo PDF. Vui lòng liên hệ quản trị viên.`);
+        } else {
+            throw new ApiError(500, `Lỗi khi tạo file PDF: ${error.message || 'Unknown error'}. Vui lòng thử lại sau hoặc liên hệ hỗ trợ.`);
+        }
     }
 };
