@@ -156,60 +156,82 @@ export const exportWishesToPDF = async (req, res) => {
             });
         }
         
+        const isHeroku = !!process.env.DYNO;
+        console.log('PDF export request for user:', userId, 'Environment:', { isHeroku });
+        
         try {
             // Try to create PDF
-            console.log('Creating PDF for user:', userId);
             const pdfBuffer = await admissionWishService.exportWishesToPDF(userId);
             
             // Set headers for PDF response
             res.setHeader('Content-Type', 'application/pdf');
-            res.setHeader('Content-Disposition', `attachment; filename="phieu-dang-ky-nguyen-vong-${userId}.pdf"`);
+            res.setHeader('Content-Disposition', `inline; filename="phieu-dang-ky-nguyen-vong-${userId}.pdf"`);
             res.setHeader('Content-Length', pdfBuffer.length);
-            res.setHeader('Cache-Control', 'no-cache');
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
             
             console.log('PDF export successful for user:', userId, 'Size:', pdfBuffer.length, 'bytes');
             res.send(pdfBuffer);
             
         } catch (pdfError) {
-            console.error('PDF creation failed:', pdfError.message);
+            console.error('PDF creation failed:', {
+                userId,
+                error: pdfError.message,
+                statusCode: pdfError.statusCode,
+                isHeroku
+            });
             
-            // On Heroku, if PDF fails, fallback to HTML temporarily
-            const isHeroku = !!process.env.DYNO;
-            if (isHeroku && pdfError.message.includes('Chrome')) {
-                console.log('Heroku Chrome issue detected, falling back to HTML for user:', userId);
+            // On Heroku or if PDF service is unavailable, automatically fallback to HTML
+            if (isHeroku || pdfError.statusCode === 503 || pdfError.message.includes('Chrome') || pdfError.message.includes('browser')) {
+                console.log('Attempting HTML fallback for user:', userId);
                 
                 try {
                     const htmlContent = await admissionWishService.exportWishesToHTML(userId);
                     
                     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-                    res.setHeader('Content-Disposition', `attachment; filename="phieu-dang-ky-nguyen-vong-${userId}.html"`);
+                    res.setHeader('Content-Disposition', `inline; filename="phieu-dang-ky-nguyen-vong-${userId}.html"`);
+                    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
                     
                     console.log('HTML fallback successful for user:', userId);
                     res.send(htmlContent);
                     return;
+                    
                 } catch (htmlError) {
                     console.error('HTML fallback also failed:', htmlError.message);
+                    throw new Error(`Không thể tạo phiếu đăng ký dưới bất kỳ định dạng nào. PDF: ${pdfError.message}. HTML: ${htmlError.message}`);
                 }
             }
             
-            // If not Heroku or other errors, throw original error
+            // If not Heroku and not a service issue, throw original error
             throw pdfError;
         }
         
     } catch (error) {
-        console.error('PDF export failed:', {
+        console.error('Complete export failure:', {
             userId: req.params.userId,
             error: error.message,
-            stack: error.stack
+            statusCode: error.statusCode,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
         
-        // Return specific error message
+        // Return appropriate error response
         const statusCode = error.statusCode || 500;
-        const message = error.message || "Không thể tạo file PDF. Vui lòng thử lại sau hoặc liên hệ hỗ trợ.";
+        let message = error.message || "Đã xảy ra lỗi khi xuất phiếu đăng ký.";
+        
+        // User-friendly error messages
+        if (statusCode === 503) {
+            message = "Dịch vụ tạo PDF tạm thời không khả dụng. Vui lòng thử lại sau ít phút.";
+        } else if (statusCode === 404) {
+            message = "Không tìm thấy dữ liệu nguyện vọng để xuất.";
+        } else if (message.includes('Chrome') || message.includes('browser')) {
+            message = "Hệ thống tạo PDF đang gặp sự cố. Vui lòng thử lại sau hoặc liên hệ hỗ trợ.";
+        }
         
         res.status(statusCode).json({
             message: message,
-            error: "PDF_GENERATION_FAILED"
+            error: "EXPORT_FAILED",
+            canRetry: statusCode === 503
         });
     }
 };

@@ -807,7 +807,7 @@ export const exportWishesToPDF = async (userId) => {
         <title>Phiếu Đăng Ký Nguyện Vọng Xét Tuyển</title>
         <style>
             body {
-                font-family: 'Times New Roman', serif;
+                font-family: Arial, sans-serif;
                 font-size: 13px;
                 line-height: 1.4;
                 margin: 0;
@@ -917,13 +917,13 @@ export const exportWishesToPDF = async (userId) => {
                 background-color: #fafafa;
             }
             .priority-col {
-                background-color: #fff3cd !important;
+                background-color: #fff3cd;
                 font-weight: bold;
                 font-size: 13px;
             }
             .major-col {
-                text-align: left !important;
-                padding-left: 8px !important;
+                text-align: left;
+                padding-left: 8px;
             }
             .major-name {
                 font-weight: bold;
@@ -1119,35 +1119,31 @@ export const exportWishesToPDF = async (userId) => {
     </html>
     `;
 
-    // Use Puppeteer to create PDF with retry logic
+    // Environment detection
+    const isProduction = process.env.NODE_ENV === 'production';
+    const isHeroku = !!process.env.DYNO;
+    
+    console.log('PDF Generation Environment:', { isProduction, isHeroku, userId });
+
+    // Use Puppeteer to create PDF with enhanced Heroku support
     let browser = null;
-    let retries = 3;
+    let retries = isHeroku ? 2 : 3; // Fewer retries on Heroku
     
     while (retries > 0) {
         try {
-            console.log(`Starting PDF creation attempt ${4 - retries} for user:`, userId);
+            console.log(`PDF creation attempt ${(isHeroku ? 2 : 3) - retries + 1} for user:`, userId);
             
-            // Configuration for different environments
-            const isProduction = process.env.NODE_ENV === 'production';
-            const isHeroku = !!process.env.DYNO;
-            
+            // Configure Puppeteer launch options
             let launchOptions = {
                 headless: 'new',
+                timeout: 30000, // Reduced timeout for Heroku
                 args: [
                     '--no-sandbox',
                     '--disable-setuid-sandbox',
                     '--disable-dev-shm-usage',
                     '--disable-gpu',
                     '--disable-web-security',
-                    '--disable-features=VizDisplayCompositor'
-                ],
-                timeout: 60000
-            };
-            
-            // Heroku-specific configuration
-            if (isHeroku) {
-                launchOptions.executablePath = process.env.GOOGLE_CHROME_BIN || '/app/.chrome-for-testing/chrome-linux64/chrome';
-                launchOptions.args.push(
+                    '--disable-features=VizDisplayCompositor',
                     '--disable-extensions',
                     '--disable-plugins',
                     '--disable-background-timer-throttling',
@@ -1155,37 +1151,66 @@ export const exportWishesToPDF = async (userId) => {
                     '--disable-renderer-backgrounding',
                     '--disable-default-apps',
                     '--no-first-run',
-                    '--single-process'
-                );
-            }
+                    '--no-zygote'
+                ]
+            };
             
-            console.log('Launching browser with config:', {
-                executablePath: launchOptions.executablePath,
-                isHeroku,
-                isProduction
-            });
+            // Heroku-specific configuration
+            if (isHeroku) {
+                // Try multiple Chrome paths for Heroku
+                const possibleChromePaths = [
+                    process.env.GOOGLE_CHROME_BIN,
+                    '/app/.chrome-for-testing/chrome-linux64/chrome',
+                    '/app/.apt/usr/bin/google-chrome-stable',
+                    '/app/.apt/opt/google/chrome/chrome',
+                    '/usr/bin/google-chrome-stable',
+                    '/usr/bin/chromium-browser'
+                ].filter(Boolean);
+                
+                if (possibleChromePaths.length > 0) {
+                    launchOptions.executablePath = possibleChromePaths[0];
+                }
+                
+                // Additional Heroku-specific args
+                launchOptions.args.push(
+                    '--single-process',
+                    '--memory-pressure-off',
+                    '--max_old_space_size=460',
+                    '--disable-background-networking',
+                    '--disable-default-apps',
+                    '--disable-sync'
+                );
+                
+                console.log('Heroku Chrome config:', {
+                    executablePath: launchOptions.executablePath,
+                    args: launchOptions.args.length
+                });
+            }
             
             browser = await puppeteer.launch(launchOptions);
             
             const page = await browser.newPage();
             
-            // Set viewport for consistent rendering
+            // Optimized page configuration for Heroku
             await page.setViewport({ 
                 width: 1024, 
                 height: 1448
             });
             
-            // Set content
+            // Set reduced timeout for Heroku
+            const pageTimeout = isHeroku ? 20000 : 60000;
+            
+            // Set content with reduced wait conditions for Heroku
             await page.setContent(htmlTemplate, { 
-                waitUntil: 'domcontentloaded',
-                timeout: 60000 
+                waitUntil: isHeroku ? 'domcontentloaded' : ['load', 'domcontentloaded'],
+                timeout: pageTimeout 
             });
             
-            // Wait for content to load
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            // Shorter wait time for Heroku
+            await new Promise(resolve => setTimeout(resolve, isHeroku ? 1000 : 2000));
             
-            // Generate PDF
-            const pdfBuffer = await page.pdf({
+            // Generate PDF with reduced options for Heroku
+            const pdfOptions = {
                 format: 'A4',
                 printBackground: true,
                 margin: {
@@ -1193,14 +1218,21 @@ export const exportWishesToPDF = async (userId) => {
                     right: '15mm',
                     bottom: '20mm',
                     left: '15mm'
-                }
-            });
+                },
+                timeout: pageTimeout
+            };
             
-            console.log('PDF created successfully, buffer size:', pdfBuffer.length);
+            const pdfBuffer = await page.pdf(pdfOptions);
+            
+            console.log('PDF created successfully, buffer size:', pdfBuffer.length, 'Environment:', { isHeroku, isProduction });
             
             // Validate PDF buffer
             if (!pdfBuffer || pdfBuffer.length === 0) {
                 throw new Error('PDF buffer is empty');
+            }
+            
+            if (pdfBuffer.length < 1000) {
+                throw new Error('PDF buffer too small, likely corrupted');
             }
             
             // Success
@@ -1210,15 +1242,24 @@ export const exportWishesToPDF = async (userId) => {
             retries--;
             console.error(`PDF creation attempt failed (${retries} retries left):`, {
                 message: error.message,
-                name: error.name
+                name: error.name,
+                isHeroku,
+                userId
             });
             
-            if (retries === 0) {
-                console.error('All PDF creation attempts failed for user:', userId);
-                throw new ApiError(500, `Không thể tạo file PDF. Lỗi: ${error.message}. Vui lòng thử lại sau.`);
+            // On Heroku, fail fast after 1 retry
+            if (retries === 0 || (isHeroku && retries <= 0)) {
+                console.error('All PDF creation attempts failed for user:', userId, 'Environment:', { isHeroku, isProduction });
+                
+                // Specific error message for Heroku
+                if (isHeroku && (error.message.includes('Chrome') || error.message.includes('browser'))) {
+                    throw new ApiError(503, `Dịch vụ tạo PDF tạm thời không khả dụng trên hệ thống. Vui lòng thử lại sau ít phút.`);
+                } else {
+                    throw new ApiError(500, `Không thể tạo file PDF: ${error.message}. Vui lòng thử lại sau.`);
+                }
             } else {
-                // Wait before retry
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                // Wait before retry (shorter on Heroku)
+                await new Promise(resolve => setTimeout(resolve, isHeroku ? 500 : 1000));
             }
         } finally {
             // Always close the browser
