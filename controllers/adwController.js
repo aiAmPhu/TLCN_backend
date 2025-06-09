@@ -156,18 +156,45 @@ export const exportWishesToPDF = async (req, res) => {
             });
         }
         
-        // Only create PDF, no HTML fallback
-        console.log('Creating PDF for user:', userId);
-        const pdfBuffer = await admissionWishService.exportWishesToPDF(userId);
-        
-        // Set headers for PDF response
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="phieu-dang-ky-nguyen-vong-${userId}.pdf"`);
-        res.setHeader('Content-Length', pdfBuffer.length);
-        res.setHeader('Cache-Control', 'no-cache');
-        
-        console.log('PDF export successful for user:', userId, 'Size:', pdfBuffer.length, 'bytes');
-        res.send(pdfBuffer);
+        try {
+            // Try to create PDF
+            console.log('Creating PDF for user:', userId);
+            const pdfBuffer = await admissionWishService.exportWishesToPDF(userId);
+            
+            // Set headers for PDF response
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename="phieu-dang-ky-nguyen-vong-${userId}.pdf"`);
+            res.setHeader('Content-Length', pdfBuffer.length);
+            res.setHeader('Cache-Control', 'no-cache');
+            
+            console.log('PDF export successful for user:', userId, 'Size:', pdfBuffer.length, 'bytes');
+            res.send(pdfBuffer);
+            
+        } catch (pdfError) {
+            console.error('PDF creation failed:', pdfError.message);
+            
+            // On Heroku, if PDF fails, fallback to HTML temporarily
+            const isHeroku = !!process.env.DYNO;
+            if (isHeroku && pdfError.message.includes('Chrome')) {
+                console.log('Heroku Chrome issue detected, falling back to HTML for user:', userId);
+                
+                try {
+                    const htmlContent = await admissionWishService.exportWishesToHTML(userId);
+                    
+                    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+                    res.setHeader('Content-Disposition', `attachment; filename="phieu-dang-ky-nguyen-vong-${userId}.html"`);
+                    
+                    console.log('HTML fallback successful for user:', userId);
+                    res.send(htmlContent);
+                    return;
+                } catch (htmlError) {
+                    console.error('HTML fallback also failed:', htmlError.message);
+                }
+            }
+            
+            // If not Heroku or other errors, throw original error
+            throw pdfError;
+        }
         
     } catch (error) {
         console.error('PDF export failed:', {
@@ -176,7 +203,7 @@ export const exportWishesToPDF = async (req, res) => {
             stack: error.stack
         });
         
-        // Return specific error message without HTML fallback
+        // Return specific error message
         const statusCode = error.statusCode || 500;
         const message = error.message || "Không thể tạo file PDF. Vui lòng thử lại sau hoặc liên hệ hỗ trợ.";
         

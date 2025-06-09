@@ -1121,24 +1121,51 @@ export const exportWishesToPDF = async (userId) => {
 
     // Use Puppeteer to create PDF with retry logic
     let browser = null;
-    let retries = 3; // Giảm xuống 3 lần để debug dễ hơn
+    let retries = 3;
     
     while (retries > 0) {
         try {
             console.log(`Starting PDF creation attempt ${4 - retries} for user:`, userId);
             
-            // Simple browser launch configuration
-            browser = await puppeteer.launch({
+            // Configuration for different environments
+            const isProduction = process.env.NODE_ENV === 'production';
+            const isHeroku = !!process.env.DYNO;
+            
+            let launchOptions = {
                 headless: 'new',
                 args: [
                     '--no-sandbox',
                     '--disable-setuid-sandbox',
                     '--disable-dev-shm-usage',
                     '--disable-gpu',
-                    '--disable-web-security'
+                    '--disable-web-security',
+                    '--disable-features=VizDisplayCompositor'
                 ],
                 timeout: 60000
+            };
+            
+            // Heroku-specific configuration
+            if (isHeroku) {
+                launchOptions.executablePath = process.env.GOOGLE_CHROME_BIN || '/app/.chrome-for-testing/chrome-linux64/chrome';
+                launchOptions.args.push(
+                    '--disable-extensions',
+                    '--disable-plugins',
+                    '--disable-background-timer-throttling',
+                    '--disable-backgrounding-occluded-windows',
+                    '--disable-renderer-backgrounding',
+                    '--disable-default-apps',
+                    '--no-first-run',
+                    '--single-process'
+                );
+            }
+            
+            console.log('Launching browser with config:', {
+                executablePath: launchOptions.executablePath,
+                isHeroku,
+                isProduction
             });
+            
+            browser = await puppeteer.launch(launchOptions);
             
             const page = await browser.newPage();
             
