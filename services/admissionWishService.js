@@ -762,10 +762,6 @@ export const exportWishesToPDF = async (userId) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Phiếu Đăng Ký Nguyện Vọng Xét Tuyển</title>
         <style>
-            @page {
-                margin: 20mm;
-                size: A4;
-            }
             body {
                 font-family: 'Times New Roman', serif;
                 font-size: 13px;
@@ -943,9 +939,18 @@ export const exportWishesToPDF = async (userId) => {
             }
             .signature-section {
                 margin-top: 30px;
-                display: flex;
-                justify-content: space-between;
-                align-items: flex-start;
+                width: 100%;
+                table-layout: fixed;
+            }
+            .signature-section-table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+            .signature-section-table td {
+                width: 50%;
+                vertical-align: top;
+                padding: 0 10px;
+                border: none;
             }
             .signature-box {
                 text-align: center;
@@ -976,7 +981,7 @@ export const exportWishesToPDF = async (userId) => {
                 page-break-before: always;
             }
             .watermark {
-                position: fixed;
+                position: absolute;
                 top: 50%;
                 left: 50%;
                 transform: translate(-50%, -50%) rotate(-45deg);
@@ -1077,21 +1082,28 @@ export const exportWishesToPDF = async (userId) => {
         </div>
 
         <div class="signature-section">
-            <div class="footer-note">
-                <strong>Ghi chú:</strong><br>
-                - Phiếu đăng ký này có giá trị pháp lý<br>
-                - Liên hệ: (028) 3896 7641 - Email: tuyensinh@hcmute.edu.vn
-            </div>
-            
-            <div class="signature-box">
-                <div class="signature-date">
-                    TP.Hồ Chí Minh, ngày ${new Date().getDate()} tháng ${new Date().getMonth() + 1} năm ${new Date().getFullYear()}
-                </div>
-                <div class="signature-title">Thí sinh</div>
-                <div class="signature-name">
-                    ${user.name || '(Ký và ghi rõ họ tên)'}
-                </div>
-            </div>
+            <table class="signature-section-table">
+                <tr>
+                    <td>
+                        <div class="footer-note">
+                            <strong>Ghi chú:</strong><br>
+                            - Phiếu đăng ký này có giá trị pháp lý<br>
+                            - Liên hệ: (028) 3896 7641 - Email: tuyensinh@hcmute.edu.vn
+                        </div>
+                    </td>
+                    <td>
+                        <div class="signature-box">
+                            <div class="signature-date">
+                                TP.Hồ Chí Minh, ngày ${new Date().getDate()} tháng ${new Date().getMonth() + 1} năm ${new Date().getFullYear()}
+                            </div>
+                            <div class="signature-title">Thí sinh</div>
+                            <div class="signature-name">
+                                ${user.name || '(Ký và ghi rõ họ tên)'}
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            </table>
         </div>
 
         <div style="margin-top: 20px; text-align: center; font-size: 10px; color: #666; border-top: 1px solid #ddd; padding-top: 10px;">
@@ -1101,34 +1113,47 @@ export const exportWishesToPDF = async (userId) => {
     </html>
     `;
 
-    // Convert HTML to PDF using puppeteer (you'll need to install puppeteer)
+    // Convert HTML to PDF using html-pdf (better for Heroku deployment)
     try {
-        const puppeteer = await import('puppeteer');
-        const browser = await puppeteer.default.launch({
-            headless: 'new',
-            args: ['--no-sandbox', '--disable-setuid-sandbox']
-        });
+        const pdf = await import('html-pdf');
         
-        const page = await browser.newPage();
-        await page.setContent(htmlTemplate, { waitUntil: 'networkidle0' });
-        
-        const pdfBuffer = await page.pdf({
+        const options = {
             format: 'A4',
-            margin: {
+            orientation: 'portrait',
+            border: {
                 top: '20mm',
+                right: '15mm',
                 bottom: '20mm',
-                left: '15mm',
-                right: '15mm'
+                left: '15mm'
             },
-            printBackground: true,
-            preferCSSPageSize: true
+            type: 'pdf',
+            quality: '75',
+            dpi: 96,
+            timeout: 30000,
+            zoomFactor: 1,
+            phantomArgs: [
+                '--web-security=false',
+                '--local-to-remote-url-access=true',
+                '--ignore-ssl-errors=true'
+            ]
+        };
+        
+        // Create PDF buffer using Promise wrapper
+        const pdfBuffer = await new Promise((resolve, reject) => {
+            pdf.default.create(htmlTemplate, options).toBuffer((err, buffer) => {
+                if (err) {
+                    console.error('PDF creation error:', err);
+                    reject(err);
+                } else {
+                    resolve(buffer);
+                }
+            });
         });
         
-        await browser.close();
         return pdfBuffer;
         
     } catch (error) {
-        console.error('Puppeteer error:', error);
-        throw new ApiError(500, "Lỗi khi tạo file PDF. Vui lòng thử lại sau.");
+        console.error('PDF export error:', error);
+        throw new ApiError(500, `Lỗi khi tạo file PDF: ${error.message}. Vui lòng thử lại sau.`);
     }
 };
