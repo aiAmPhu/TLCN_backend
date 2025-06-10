@@ -4,6 +4,7 @@ import User from "./user.js";
 import Subject from "./Subject.js";
 import AdmissionInformation from "./admissionInfomation.js";
 import Photo from "./photoID.js";
+import Announcement from "./announcement.js";
 // Quan hệ
 Transcript.hasMany(Score, {
     foreignKey: "transcriptId",
@@ -34,4 +35,15 @@ Score.belongsTo(Subject, {
 AdmissionInformation.hasOne(Photo, { foreignKey: "userId", as: "Photo" });
 Photo.belongsTo(AdmissionInformation, { foreignKey: "userId" });
 
-export { Transcript, Score, User };
+// Announcement associations
+Announcement.belongsTo(User, {
+    foreignKey: "authorId",
+    as: "author"
+});
+
+User.hasMany(Announcement, {
+    foreignKey: "authorId",
+    as: "announcements"
+});
+
+export { Transcript, Score, User, Announcement };
