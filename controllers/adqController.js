@@ -43,3 +43,14 @@ export const deleteAdQuantity = async (req, res) => {
         res.status(status).json({ message });
     }
 };
+
+export const importAdQuantities = async (req, res) => {
+    try {
+        const result = await admissionQuantityService.importAdQuantities(req.body);
+        res.status(200).json(result);
+    } catch (error) {
+        const status = error.statusCode || 500;
+        const message = error.message || "Lỗi khi import dữ liệu.";
+        res.status(status).json({ message });
+    }
+};

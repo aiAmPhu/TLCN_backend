@@ -95,3 +95,68 @@ export const deleteAdQuantity = async (data) => {
     });
     return { message: "Xóa chỉ tiêu thành công." };
 };
+
+export const importAdQuantities = async (data) => {
+    const { data: importData } = data;
+    let successCount = 0;
+    let skippedCount = 0;
+    let errorCount = 0;
+    const errors = [];
+
+    if (!importData || !Array.isArray(importData)) {
+        throw new ApiError(400, "Dữ liệu import không hợp lệ.");
+    }
+
+    for (const item of importData) {
+        try {
+            const { majorId, criteriaId, quantity } = item;
+
+            // Validate required fields
+            if (!majorId || !criteriaId || quantity === undefined || quantity === null) {
+                errorCount++;
+                errors.push(`Thiếu thông tin bắt buộc: majorId=${majorId}, criteriaId=${criteriaId}, quantity=${quantity}`);
+                continue;
+            }
+
+            // Check if record already exists
+            const existingRecord = await AdmissionQuantity.findOne({
+                where: { majorId, criteriaId },
+            });
+
+            if (existingRecord) {
+                // Update existing record
+                await existingRecord.update({ quantity: parseInt(quantity) });
+                successCount++;
+            } else {
+                // Create new record
+                const maxRecord = await AdmissionQuantity.findOne({
+                    order: [["aqId", "DESC"]],
+                });
+                const newId = maxRecord ? maxRecord.aqId + 1 : 1;
+
+                await AdmissionQuantity.create({
+                    aqId: newId,
+                    majorId,
+                    criteriaId,
+                    quantity: parseInt(quantity),
+                });
+                successCount++;
+            }
+        } catch (error) {
+            errorCount++;
+            if (error instanceof Sequelize.ForeignKeyConstraintError) {
+                errors.push(`Dữ liệu không hợp lệ (khóa ngoại): majorId=${item.majorId}, criteriaId=${item.criteriaId}`);
+            } else {
+                errors.push(`Lỗi xử lý: ${error.message}`);
+            }
+        }
+    }
+
+    return {
+        message: "Import hoàn thành",
+        success: successCount,
+        skipped: skippedCount,
+        errors: errorCount,
+        errorDetails: errors.length > 0 ? errors : undefined
+    };
+};
