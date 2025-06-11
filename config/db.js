@@ -10,7 +10,7 @@ const sequelize = new Sequelize(process.env.DB_NAME, process.env.DB_USER, proces
     logging: false,
 
     pool: {
-        max: 3, //  Giảm từ 5 xuống 3
+        max: 5,
         min: 1,
         acquire: 30000, //  Thời gian chờ lấy connection
         idle: 5000, // Giảm từ 10000 xuống 5000

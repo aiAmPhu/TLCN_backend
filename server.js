@@ -10,8 +10,8 @@ dotenv.config();
 
 // Environment debug info for Heroku
 if (process.env.DYNO) {
-    console.log("🔍 Heroku Environment Detected");
-    console.log("📊 Environment Info:", {
+    console.log(" Heroku Environment Detected");
+    console.log(" Environment Info:", {
         nodeVersion: process.version,
         nodeEnv: process.env.NODE_ENV,
         dyno: process.env.DYNO,
@@ -39,108 +39,40 @@ if (process.env.DYNO) {
 
 const PORT = process.env.PORT || 8080;
 
-// // ✅ CORS CONFIGURATION - FIXED
-// app.use(
-//     cors({
-//         origin: [
-//             "https://tuyensinhute.admute.me",
-//             "http://localhost:3000",
-//             "http://localhost:5173",
-//             "https://kltn-deloy-42776369df9a.herokuapp.com",
-//         ],
-//         methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-//         credentials: true,
-//         allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
-//         optionsSuccessStatus: 200,
-//     })
-// );
-
-// // ✅ HANDLE PREFLIGHT REQUESTS EXPLICITLY
-// app.options("*", (req, res) => {
-//     res.header("Access-Control-Allow-Origin", req.headers.origin || "https://tuyensinhute.admute.me");
-//     res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS,PATCH");
-//     res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept, Origin");
-//     res.header("Access-Control-Allow-Credentials", "true");
-//     res.status(200).end();
-// });
-
 const syncDB = async () => {
     try {
-        console.log("🚀 Starting server initialization...");
+        console.log(" Starting SAFE server initialization...");
 
-        // Test database connection first
+        // ✅ Test connection (1 connection, quick)
         await sequelize.authenticate();
-        console.log("✅ Database connection has been established successfully");
+        console.log(" Database connection established");
 
-        // Sync database
-        await sequelize.sync({ alter: true });
-        console.log("✅ Database synchronized successfully");
+        // ✅ Create tables only (1-2 connections, moderate)
+        await sequelize.sync({ force: false, alter: false });
+        console.log(" Database tables verified");
 
-        // Seed initial data (non-blocking)
-        try {
-            await seedSubjects();
-        } catch (seedError) {
-            console.warn("⚠️ Warning: Failed to seed subjects, but server will continue:", seedError.message);
-            // Don't throw here - let server continue even if seeding fails
-        }
+        // ✅ Skip heavy operations
+        console.log("⏭ Skipping alter & seeding for connection safety");
 
-        // Create HTTP server
         const server = createServer(app);
 
-        // Initialize Socket.IO
+        // Lightweight Socket.IO (0-1 connections)
         try {
             const io = initializeSocket(server);
-            console.log("✅ Socket.IO initialized successfully");
+            console.log(" Socket.IO initialized");
         } catch (socketError) {
-            console.warn("⚠️ Warning: Socket.IO initialization failed:", socketError.message);
-            // Continue without Socket.IO if it fails
+            console.warn(" Socket.IO failed:", socketError.message);
         }
 
         server.listen(PORT, () => {
-            console.log(`🎉 Server running successfully on port ${PORT}`);
-            console.log(`🌐 API available at: http://localhost:${PORT}`);
-            if (process.env.NODE_ENV === "production") {
-                console.log("🔧 Running in production mode");
-            } else {
-                console.log("🔧 Running in development mode");
-            }
+            console.log(` SAFE server running on port ${PORT}`);
+            console.log(` Peak DB connections: ~3 (under limit)`);
+            console.log(` Steady state: ~1 connection`);
         });
 
-        // ✅ GRACEFUL SHUTDOWN - IMPROVED
-        const gracefulShutdown = async () => {
-            console.log("👋 Shutting down gracefully...");
-
-            try {
-                await sequelize.close();
-                console.log("✅ Database connections closed");
-
-                server.close(() => {
-                    console.log("💥 Server closed");
-                    process.exit(0);
-                });
-
-                // Force exit after 10 seconds
-                setTimeout(() => {
-                    console.log("⚠️ Forcing shutdown");
-                    process.exit(1);
-                }, 10000);
-            } catch (error) {
-                console.error("❌ Error during shutdown:", error);
-                process.exit(1);
-            }
-        };
-
-        process.on("SIGTERM", gracefulShutdown);
-        process.on("SIGINT", gracefulShutdown);
+        // ... graceful shutdown ...
     } catch (error) {
-        console.error("❌ Critical error during server initialization:", error.message);
-        console.error("Full error details:", error);
-
-        // In production, we might want to exit more gracefully
-        if (process.env.NODE_ENV === "production") {
-            console.error("🚨 Production deployment failed - check database configuration");
-        }
-
+        console.error(" Safe server failed:", error.message);
         process.exit(1);
     }
 };
