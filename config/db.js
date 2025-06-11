@@ -6,7 +6,12 @@ dotenv.config(); // Load biến môi trường từ .env
 const sequelize = new Sequelize(process.env.DB_NAME, process.env.DB_USER, process.env.DB_PASSWORD, {
     host: process.env.DB_HOST,
     port: process.env.DB_PORT,
-    dialect: "mysql", // Đổi thành MySQL
-    logging: false, // Ẩn log SQL nếu không cần
+    dialect: "mysql",
+    logging: false,
+    pool: {
+        max: 5,
+        min: 1,
+        idle: 10000,
+    },
 });
 export default sequelize;
