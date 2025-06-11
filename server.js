@@ -39,30 +39,30 @@ if (process.env.DYNO) {
 
 const PORT = process.env.PORT || 8080;
 
-// ✅ CORS CONFIGURATION - FIXED
-app.use(
-    cors({
-        origin: [
-            "https://tuyensinhute.admute.me",
-            "http://localhost:3000",
-            "http://localhost:5173",
-            "https://kltn-deloy-42776369df9a.herokuapp.com",
-        ],
-        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-        credentials: true,
-        allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
-        optionsSuccessStatus: 200,
-    })
-);
+// // ✅ CORS CONFIGURATION - FIXED
+// app.use(
+//     cors({
+//         origin: [
+//             "https://tuyensinhute.admute.me",
+//             "http://localhost:3000",
+//             "http://localhost:5173",
+//             "https://kltn-deloy-42776369df9a.herokuapp.com",
+//         ],
+//         methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+//         credentials: true,
+//         allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
+//         optionsSuccessStatus: 200,
+//     })
+// );
 
-// ✅ HANDLE PREFLIGHT REQUESTS EXPLICITLY
-app.options("*", (req, res) => {
-    res.header("Access-Control-Allow-Origin", req.headers.origin || "https://tuyensinhute.admute.me");
-    res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS,PATCH");
-    res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept, Origin");
-    res.header("Access-Control-Allow-Credentials", "true");
-    res.status(200).end();
-});
+// // ✅ HANDLE PREFLIGHT REQUESTS EXPLICITLY
+// app.options("*", (req, res) => {
+//     res.header("Access-Control-Allow-Origin", req.headers.origin || "https://tuyensinhute.admute.me");
+//     res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS,PATCH");
+//     res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept, Origin");
+//     res.header("Access-Control-Allow-Credentials", "true");
+//     res.status(200).end();
+// });
 
 const syncDB = async () => {
     try {
