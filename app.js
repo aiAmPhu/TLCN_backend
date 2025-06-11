@@ -32,7 +32,12 @@ const app = express();
 // app.use(cors());
 app.use(
     cors({
-        origin: ["https://tuyensinhute.admute.me", "http://localhost:3000", "http://localhost:5173"],
+        origin: [
+            "https://tuyensinhute.admute.me",
+            "http://localhost:3000",
+            "http://localhost:5173",
+            "https://kltn-frontend-git-thienphu-pham-le-thien-phus-projects.vercel.app",
+        ],
         methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
         credentials: true,
         allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
@@ -40,7 +45,16 @@ app.use(
     })
 );
 app.options("*", (req, res) => {
-    res.header("Access-Control-Allow-Origin", req.headers.origin || "https://tuyensinhute.admute.me");
+    const allowedOrigins = [
+        "https://tuyensinhute.admute.me",
+        "https://kltn-frontend-git-thienphu-pham-le-thien-phus-projects.vercel.app",
+        "http://localhost:3000",
+        "http://localhost:5173",
+    ];
+    const origin = req.headers.origin;
+    if (allowedOrigins.includes(origin)) {
+        res.header("Access-Control-Allow-Origin", origin);
+    }
     res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS,PATCH");
     res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept, Origin");
     res.header("Access-Control-Allow-Credentials", "true");
