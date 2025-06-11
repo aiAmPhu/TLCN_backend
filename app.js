@@ -19,20 +19,43 @@ import adwRoutes from "./routes/adwRoutes.js";
 import permissionRoutes from "./routes/permissionRoutes.js";
 import chatRoutes from "./routes/chatRoutes.js";
 import statisticsSnapshotRoutes from "./routes/statisticsSnapshotRoutes.js";
-import notificationRoutes from './routes/notificationRoutes.js';
-import authRoutes from './routes/authRoutes.js';
-import subjectRoutes from './routes/subjectRoutes.js';
-import announcementRoutes from './routes/announcementRoutes.js';
-import passport from './config/passport.js';
+import notificationRoutes from "./routes/notificationRoutes.js";
+import authRoutes from "./routes/authRoutes.js";
+import subjectRoutes from "./routes/subjectRoutes.js";
+import announcementRoutes from "./routes/announcementRoutes.js";
+import passport from "./config/passport.js";
 
 dotenv.config();
 //connectDB();
 
 const app = express();
-app.use(cors());
+// app.use(cors());
+app.use(
+    cors({
+        origin: ["https://tuyensinhute.admute.me", "http://localhost:3000", "http://localhost:5173"],
+        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+        credentials: true,
+        allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
+        optionsSuccessStatus: 200,
+    })
+);
+app.options("*", (req, res) => {
+    res.header("Access-Control-Allow-Origin", req.headers.origin || "https://tuyensinhute.admute.me");
+    res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS,PATCH");
+    res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept, Origin");
+    res.header("Access-Control-Allow-Credentials", "true");
+    res.status(200).end();
+});
 app.use(express.json());
 app.use(passport.initialize());
-
+app.get("/health", (req, res) => {
+    res.status(200).json({
+        status: "OK",
+        timestamp: new Date().toISOString(),
+        message: "Server is running",
+        environment: process.env.NODE_ENV || "development",
+    });
+});
 app.use("/api", uploadRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/adbs", adbRoutes);
@@ -51,11 +74,9 @@ app.use("/api/wish", adwRoutes);
 app.use("/api/permissions", permissionRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/snapshots", statisticsSnapshotRoutes);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/auth', authRoutes);
-app.use('/api/subjects', subjectRoutes);
-app.use('/api/announcements', announcementRoutes);
-
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/subjects", subjectRoutes);
+app.use("/api/announcements", announcementRoutes);
 
 export default app;
-
