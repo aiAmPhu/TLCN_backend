@@ -46,13 +46,20 @@ const syncDB = async () => {
         // ✅ Test connection (1 connection, quick)
         await sequelize.authenticate();
         console.log(" Database connection established");
-
+        // Log connection stats after authenticate
+        setTimeout(() => {
+            const stats = getConnectionStats();
+            console.log(`📊 After authenticate: ${stats.active}/${stats.max} connections`);
+        }, 1000);
         // ✅ Create tables only (1-2 connections, moderate)
         await sequelize.sync({ force: false, alter: false });
         console.log(" Database tables verified");
-
+        setTimeout(() => {
+            const stats = getConnectionStats();
+            console.log(`📊 After sync: ${stats.active}/${stats.max} connections`);
+        }, 1000);
         // ✅ Skip heavy operations
-        console.log("⏭ Skipping alter & seeding for connection safety");
+        console.log(" Skipping alter & seeding for connection safety");
 
         const server = createServer(app);
 

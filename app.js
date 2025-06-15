@@ -24,6 +24,8 @@ import authRoutes from "./routes/authRoutes.js";
 import subjectRoutes from "./routes/subjectRoutes.js";
 import announcementRoutes from "./routes/announcementRoutes.js";
 import passport from "./config/passport.js";
+import sequelize from "./config/db.js";
+import { getConnectionStats } from "./config/db.js";
 
 dotenv.config();
 //connectDB();
@@ -60,16 +62,59 @@ app.options("*", (req, res) => {
     res.header("Access-Control-Allow-Credentials", "true");
     res.status(200).end();
 });
+// ✅ CONNECTION STATS ENDPOINT
+app.get("/admin/connections", (req, res) => {
+    try {
+        const stats = getConnectionStats();
+        res.json({
+            success: true,
+            data: stats,
+            message: "Connection statistics retrieved successfully",
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            error: error.message,
+        });
+    }
+});
+
+// ✅ DETAILED SYSTEM STATUS
+app.get("/admin/system-status", async (req, res) => {
+    try {
+        const connectionStats = getConnectionStats();
+
+        // Test database connection
+        await sequelize.authenticate();
+
+        // Get table count
+        const [tables] = await sequelize.query("SHOW TABLES");
+
+        res.json({
+            success: true,
+            system: {
+                uptime: process.uptime(),
+                memory: process.memoryUsage(),
+                environment: process.env.NODE_ENV,
+                port: process.env.PORT || 8080,
+                timestamp: new Date().toISOString(),
+            },
+            database: {
+                connected: true,
+                tables: tables.length,
+                connections: connectionStats,
+            },
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            error: error.message,
+            timestamp: new Date().toISOString(),
+        });
+    }
+});
 app.use(express.json());
 app.use(passport.initialize());
-app.get("/health", (req, res) => {
-    res.status(200).json({
-        status: "OK",
-        timestamp: new Date().toISOString(),
-        message: "Server is running",
-        environment: process.env.NODE_ENV || "development",
-    });
-});
 app.use("/api", uploadRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/adbs", adbRoutes);
