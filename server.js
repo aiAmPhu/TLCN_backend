@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import sequelize from "./config/db.js";
 import { createServer } from "http";
 import { initializeSocket } from "./services/socketService.js";
+import { getConnectionStats } from "./config/db.js";
 import seedSubjects from "./scripts/seedSubjects.js";
 
 dotenv.config();
