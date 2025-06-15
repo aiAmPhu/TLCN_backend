@@ -62,27 +62,49 @@ sequelize.addHook("afterConnect", (connection) => {
     totalConnections++;
 
     const timestamp = new Date().toISOString();
+
+    // Try to get current API context (if available)
+    const stack = new Error().stack;
+    let apiEndpoint = "unknown";
+
+    // Simple pattern matching for common routes
+    if (stack.includes("userRoutes")) apiEndpoint = "/api/users/*";
+    else if (stack.includes("admRoutes")) apiEndpoint = "/api/adms/*";
+    else if (stack.includes("jwtRoutes")) apiEndpoint = "/api/jwt/*";
+    else if (stack.includes("uploadRoutes")) apiEndpoint = "/api/upload/*";
+    else if (stack.includes("authenticate")) apiEndpoint = "server-startup";
+    else if (stack.includes("sync")) apiEndpoint = "database-sync";
+
     const connectionInfo = {
         id: totalConnections,
         timestamp,
         action: "CONNECT",
         active: activeConnections,
         max: sequelize.options.pool.max,
+        apiEndpoint,
+        duration: null, // Will be set on disconnect
     };
 
     connectionHistory.push(connectionInfo);
 
-    console.log(`📊 [${timestamp}] DB CONNECT #${totalConnections}`);
+    console.log(` [${timestamp}] DB CONNECT #${totalConnections} (${apiEndpoint})`);
     console.log(`   └─ Active: ${activeConnections}/${sequelize.options.pool.max}`);
 
-    // Keep only last 20 connection events
-    if (connectionHistory.length > 20) {
-        connectionHistory = connectionHistory.slice(-20);
+    // Keep connection reference for duration tracking
+    connection._connectionStart = Date.now();
+    connection._connectionId = totalConnections;
+    connection._apiEndpoint = apiEndpoint;
+
+    // Keep only last 50 connection events
+    if (connectionHistory.length > 50) {
+        connectionHistory = connectionHistory.slice(-50);
     }
 });
 
-// Track connection closure
+// Enhanced disconnection tracking
 sequelize.addHook("beforeDisconnect", (connection) => {
+    const connectionDuration = connection._connectionStart ? Date.now() - connection._connectionStart : 0;
+
     activeConnections = Math.max(0, activeConnections - 1);
 
     const timestamp = new Date().toISOString();
@@ -91,15 +113,21 @@ sequelize.addHook("beforeDisconnect", (connection) => {
         action: "DISCONNECT",
         active: activeConnections,
         max: sequelize.options.pool.max,
+        apiEndpoint: connection._apiEndpoint || "unknown",
+        duration: connectionDuration,
+        connectionId: connection._connectionId,
     };
 
     connectionHistory.push(connectionInfo);
 
-    console.log(`📊 [${timestamp}] DB DISCONNECT`);
+    console.log(
+        ` [${timestamp}] DB DISCONNECT #${connection._connectionId || "?"} (${connection._apiEndpoint || "unknown"})`
+    );
+    console.log(`   ├─ Duration: ${connectionDuration}ms`);
     console.log(`   └─ Active: ${activeConnections}/${sequelize.options.pool.max}`);
 
-    if (connectionHistory.length > 20) {
-        connectionHistory = connectionHistory.slice(-20);
+    if (connectionHistory.length > 50) {
+        connectionHistory = connectionHistory.slice(-50);
     }
 });
 //  CONNECTION STATS FUNCTION
@@ -113,15 +141,5 @@ export const getConnectionStats = () => {
         timestamp: new Date().toISOString(),
     };
 };
-
-//  PERIODIC CONNECTION REPORTING
-setInterval(() => {
-    if (activeConnections > 0) {
-        console.log(` [${new Date().toISOString()}] Connection Status:`);
-        console.log(`   └─ Active: ${activeConnections}/${sequelize.options.pool.max}`);
-        console.log(`   └─ Total Created: ${totalConnections}`);
-        console.log(`   └─ Uptime: ${Math.floor(process.uptime())}s`);
-    }
-}, 30000); // Every 30 seconds
 
 export default sequelize;

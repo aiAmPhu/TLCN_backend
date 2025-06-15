@@ -31,6 +31,35 @@ dotenv.config();
 //connectDB();
 
 const app = express();
+app.use((req, res, next) => {
+    const startTime = Date.now();
+    const requestId = Math.random().toString(36).substr(2, 9);
+
+    // Log incoming request
+    console.log(`🌐 [${new Date().toISOString()}] ${req.method} ${req.path} - Request #${requestId}`);
+
+    // Track response
+    res.on("finish", () => {
+        const duration = Date.now() - startTime;
+        const stats = getConnectionStats();
+
+        console.log(` [${new Date().toISOString()}] ${req.method} ${req.path} completed`);
+        console.log(`   ├─ Status: ${res.statusCode}`);
+        console.log(`   ├─ Duration: ${duration}ms`);
+        console.log(`   └─ DB Connections: ${stats.active}/${stats.max}`);
+
+        // Log connection history if any activity
+        if (stats.history.length > 0) {
+            const recentActivity = stats.history.slice(-3);
+            console.log(
+                `   └─ Recent DB Activity:`,
+                recentActivity.map((h) => `${h.action} (${h.active}/${h.max})`).join(", ")
+            );
+        }
+    });
+
+    next();
+});
 // app.use(cors());
 app.use(
     cors({
@@ -75,41 +104,6 @@ app.get("/admin/connections", (req, res) => {
         res.status(500).json({
             success: false,
             error: error.message,
-        });
-    }
-});
-
-// ✅ DETAILED SYSTEM STATUS
-app.get("/admin/system-status", async (req, res) => {
-    try {
-        const connectionStats = getConnectionStats();
-
-        // Test database connection
-        await sequelize.authenticate();
-
-        // Get table count
-        const [tables] = await sequelize.query("SHOW TABLES");
-
-        res.json({
-            success: true,
-            system: {
-                uptime: process.uptime(),
-                memory: process.memoryUsage(),
-                environment: process.env.NODE_ENV,
-                port: process.env.PORT || 8080,
-                timestamp: new Date().toISOString(),
-            },
-            database: {
-                connected: true,
-                tables: tables.length,
-                connections: connectionStats,
-            },
-        });
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            error: error.message,
-            timestamp: new Date().toISOString(),
         });
     }
 });
