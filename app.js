@@ -24,42 +24,11 @@ import authRoutes from "./routes/authRoutes.js";
 import subjectRoutes from "./routes/subjectRoutes.js";
 import announcementRoutes from "./routes/announcementRoutes.js";
 import passport from "./config/passport.js";
-import sequelize from "./config/db.js";
-import { getConnectionStats } from "./config/db.js";
 
 dotenv.config();
 //connectDB();
 
 const app = express();
-app.use((req, res, next) => {
-    const startTime = Date.now();
-    const requestId = Math.random().toString(36).substr(2, 9);
-
-    // Log incoming request
-    console.log(`🌐 [${new Date().toISOString()}] ${req.method} ${req.path} - Request #${requestId}`);
-
-    // Track response
-    res.on("finish", () => {
-        const duration = Date.now() - startTime;
-        const stats = getConnectionStats();
-
-        console.log(` [${new Date().toISOString()}] ${req.method} ${req.path} completed`);
-        console.log(`   ├─ Status: ${res.statusCode}`);
-        console.log(`   ├─ Duration: ${duration}ms`);
-        console.log(`   └─ DB Connections: ${stats.active}/${stats.max}`);
-
-        // Log connection history if any activity
-        if (stats.history.length > 0) {
-            const recentActivity = stats.history.slice(-3);
-            console.log(
-                `   └─ Recent DB Activity:`,
-                recentActivity.map((h) => `${h.action} (${h.active}/${h.max})`).join(", ")
-            );
-        }
-    });
-
-    next();
-});
 // app.use(cors());
 app.use(
     cors({
@@ -91,22 +60,7 @@ app.options("*", (req, res) => {
     res.header("Access-Control-Allow-Credentials", "true");
     res.status(200).end();
 });
-// ✅ CONNECTION STATS ENDPOINT
-app.get("/admin/connections", (req, res) => {
-    try {
-        const stats = getConnectionStats();
-        res.json({
-            success: true,
-            data: stats,
-            message: "Connection statistics retrieved successfully",
-        });
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            error: error.message,
-        });
-    }
-});
+
 app.use(express.json());
 app.use(passport.initialize());
 app.use("/api", uploadRoutes);

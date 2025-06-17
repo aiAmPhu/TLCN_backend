@@ -1,11 +1,8 @@
 import app from "./app.js";
-import cors from "cors";
 import dotenv from "dotenv";
 import sequelize from "./config/db.js";
 import { createServer } from "http";
 import { initializeSocket } from "./services/socketService.js";
-import { getConnectionStats } from "./config/db.js";
-import seedSubjects from "./scripts/seedSubjects.js";
 
 dotenv.config();
 
@@ -44,29 +41,17 @@ const syncDB = async () => {
     try {
         console.log(" Starting SAFE server initialization...");
 
-        // ✅ Test connection (1 connection, quick)
         await sequelize.authenticate();
         console.log(" Database connection established");
-        // Log connection stats after authenticate
-        setTimeout(() => {
-            const stats = getConnectionStats();
-            console.log(`📊 After authenticate: ${stats.active}/${stats.max} connections`);
-        }, 1000);
-        // ✅ Create tables only (1-2 connections, moderate)
+
         await sequelize.sync({ force: false, alter: false });
         console.log(" Database tables verified");
-        setTimeout(() => {
-            const stats = getConnectionStats();
-            console.log(`📊 After sync: ${stats.active}/${stats.max} connections`);
-        }, 1000);
-        // ✅ Skip heavy operations
-        console.log(" Skipping alter & seeding for connection safety");
 
         const server = createServer(app);
 
         // Lightweight Socket.IO (0-1 connections)
         try {
-            const io = initializeSocket(server);
+            initializeSocket(server);
             console.log(" Socket.IO initialized");
         } catch (socketError) {
             console.warn(" Socket.IO failed:", socketError.message);
@@ -74,8 +59,6 @@ const syncDB = async () => {
 
         server.listen(PORT, () => {
             console.log(` SAFE server running on port ${PORT}`);
-            console.log(` Peak DB connections: ~3 (under limit)`);
-            console.log(` Steady state: ~1 connection`);
         });
 
         // ... graceful shutdown ...
