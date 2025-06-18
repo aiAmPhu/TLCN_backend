@@ -17,7 +17,7 @@ export const acceptPhotoID = async (req, res) => {
         const { userId } = req.params;
         const result = await photoIDService.acceptPhotoID(userId);
         // Send notification
-        await createPhotoNotification(userId, 'accepted');
+        await createPhotoNotification(userId, "accepted");
         res.json(result);
     } catch (error) {
         res.status(error.statusCode || 500).json({
@@ -32,7 +32,7 @@ export const rejectPhotoID = async (req, res) => {
         const { feedback } = req.body;
         const result = await photoIDService.rejectPhotoID(userId, feedback);
         // Send notification
-        await createPhotoNotification(userId, 'rejected', feedback);
+        await createPhotoNotification(userId, "rejected", feedback);
         res.json(result);
     } catch (error) {
         res.status(error.statusCode || 500).json({
