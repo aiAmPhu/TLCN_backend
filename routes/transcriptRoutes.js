@@ -15,6 +15,6 @@ router.post("/add", authenticate, authorizeRoles("user", "admin"), addTranscript
 router.get("/getAll", authenticate, authorizeRoles("reviewer"), getAllTranscripts);
 router.put("/accept/:userId", authenticate, authorizeRoles("reviewer"), acceptTranscript);
 router.put("/reject/:userId", authenticate, authorizeRoles("reviewer"), rejectTranscript);
-router.put("/update/:userId", authenticate, authorizeRoles("user"), updateTranscript);
+router.put("/update/:userId", authenticate, authorizeRoles("user", "admin"), updateTranscript);
 router.get("/getTranscriptByE/:userId", authenticate, authorizeRoles("user", "reviewer"), getTranscriptByUserId);
 export default router;
