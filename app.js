@@ -62,6 +62,30 @@ app.options("*", (req, res) => {
 });
 
 app.use(express.json());
+app.use((req, res, next) => {
+    // Tăng timeout cho route filter
+    if (req.path.includes("/filter")) {
+        req.setTimeout(600000); // 10 phút
+        res.setTimeout(600000); // 10 phút
+    }
+    next();
+});
+app.use((req, res, next) => {
+    // Tăng timeout cho route filter
+    if (req.path.includes("/create-yearly")) {
+        req.setTimeout(600000); // 10 phút
+        res.setTimeout(600000); // 10 phút
+    }
+    next();
+});
+app.use((req, res, next) => {
+    // Tăng timeout cho route filter
+    if (req.path.includes("/create")) {
+        req.setTimeout(600000); // 10 phút
+        res.setTimeout(600000); // 10 phút
+    }
+    next();
+});
 app.use(passport.initialize());
 app.use("/api", uploadRoutes);
 app.use("/api/users", userRoutes);

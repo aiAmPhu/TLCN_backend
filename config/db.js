@@ -12,15 +12,15 @@ const sequelize = new Sequelize(process.env.DB_NAME, process.env.DB_USER, proces
     pool: {
         max: 5,
         min: 1,
-        acquire: 30000, //  Thời gian chờ lấy connection
-        idle: 5000, // Giảm từ 10000 xuống 5000
+        acquire: 120000, //  Thời gian chờ lấy connection
+        idle: 1000, // Giảm từ 10000 xuống 5000
         evict: 1000, //  Cleanup interval
         handleDisconnects: true, //  Auto reconnect
     },
 
     // Timeout settings
     dialectOptions: {
-        connectTimeout: 20000,
+        connectTimeout: 120000,
         ssl:
             process.env.NODE_ENV === "production"
                 ? {
