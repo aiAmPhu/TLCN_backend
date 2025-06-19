@@ -33,7 +33,7 @@ const sequelize = new Sequelize(process.env.DB_NAME, process.env.DB_USER, proces
     // Retry logic
     retry: {
         max: 3,
-        timeout: 3000,
+        timeout: 600000,
         match: [
             /ETIMEDOUT/,
             /EHOSTUNREACH/,

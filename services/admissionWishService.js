@@ -16,7 +16,7 @@ import { Op } from "sequelize";
 import sequelize from "../config/db.js";
 import { ApiError } from "../utils/ApiError.js";
 import * as statisticsSnapshotService from "./statisticsSnapshotService.js";
-import puppeteer from 'puppeteer';
+import puppeteer from "puppeteer";
 
 export const getFilteredWishesForAdmin = async (filterConditions) => {
     try {
@@ -470,58 +470,105 @@ export const getAcceptedWishes = async () => {
 };
 
 export const filterAdmissionResults = async () => {
-    // Lấy toàn bộ nguyện vọng
-    const wishes = await AdmissionWishes.findAll({
-        where: {
-            status: { [Op.not]: "accepted" },
-        },
-        raw: true,
-    });
-    // Lấy chỉ tiêu từ bảng Quantity
-    const quantities = await AdmissionQuantity.findAll({ raw: true });
-    const quotaMap = {};
-    for (const q of quantities) {
-        const key = `${q.criteriaId}-${q.majorId}`;
-        quotaMap[key] = q.quantity ?? 0;
-    }
-    // Gom nhóm theo criteriaId-majorId
-    const grouped = {};
-    for (const wish of wishes) {
-        const key = `${wish.criteriaId}-${wish.majorId}`;
-        if (!grouped[key]) grouped[key] = [];
-        grouped[key].push(wish);
-    }
-    const acceptedWishes = [];
-    const acceptedUserIds = new Set();
-    // Lọc theo từng nhóm
-    for (const key in grouped) {
-        const group = grouped[key];
-        const quota = quotaMap[key] || 0;
-        // Sắp xếp theo điểm giảm dần → ưu tiên tăng dần
-        group.sort((a, b) => {
-            if (b.scores !== a.scores) return b.scores - a.scores;
-            return a.priority - b.priority;
+    const transaction = await sequelize.transaction();
+
+    try {
+        console.log("Starting filter process...");
+
+        // 1. Lấy toàn bộ nguyện vọng
+        const wishes = await AdmissionWishes.findAll({
+            where: { status: { [Op.not]: "accepted" } },
+            raw: true,
+            transaction,
         });
-        let count = 0;
-        for (const wish of group) {
-            if (count >= quota) break;
-            if (!acceptedUserIds.has(wish.uId)) {
+
+        // 2. Lấy chỉ tiêu
+        const quantities = await AdmissionQuantity.findAll({
+            raw: true,
+            transaction,
+        });
+
+        const quotaMap = {};
+        for (const q of quantities) {
+            const key = `${q.criteriaId}-${q.majorId}`;
+            quotaMap[key] = q.quantity ?? 0;
+        }
+
+        // 3. Sắp xếp TẤT CẢ nguyện vọng theo ưu tiên trước, điểm sau
+        wishes.sort((a, b) => {
+            if (a.priority !== b.priority) return a.priority - b.priority; // Ưu tiên 1, 2, 3...
+            return b.scores - a.scores; // Điểm cao trước trong cùng ưu tiên
+        });
+
+        const acceptedWishes = [];
+        const rejectedWishes = [];
+        const acceptedUserIds = new Set();
+        const quotaUsed = {}; // Theo dõi quota đã dùng
+
+        // 4. Duyệt từng nguyện vọng theo thứ tự ưu tiên
+        for (const wish of wishes) {
+            const key = `${wish.criteriaId}-${wish.majorId}`;
+            const quota = quotaMap[key] || 0;
+            const used = quotaUsed[key] || 0;
+
+            if (acceptedUserIds.has(wish.uId)) {
+                // User đã trúng nguyện vọng khác -> reject nguyện vọng này
+                rejectedWishes.push(wish);
+            } else if (used < quota) {
+                // Còn chỗ và user chưa trúng -> accept
                 acceptedWishes.push(wish);
                 acceptedUserIds.add(wish.uId);
-                count++;
+                quotaUsed[key] = used + 1;
+            } else {
+                // Hết chỗ -> reject
+                rejectedWishes.push(wish);
             }
         }
+
+        console.log(`Processing: ${acceptedWishes.length} accepted, ${rejectedWishes.length} rejected`);
+
+        // 5. Cập nhật database theo batch
+        const BATCH_SIZE = 100;
+
+        // Update accepted
+        const acceptedIds = acceptedWishes.map((w) => w.wishId);
+        for (let i = 0; i < acceptedIds.length; i += BATCH_SIZE) {
+            const batch = acceptedIds.slice(i, i + BATCH_SIZE);
+            await AdmissionWishes.update(
+                { status: "accepted" },
+                {
+                    where: { wishId: { [Op.in]: batch } },
+                    transaction,
+                }
+            );
+        }
+
+        // Update rejected
+        const rejectedIds = rejectedWishes.map((w) => w.wishId);
+        for (let i = 0; i < rejectedIds.length; i += BATCH_SIZE) {
+            const batch = rejectedIds.slice(i, i + BATCH_SIZE);
+            await AdmissionWishes.update(
+                { status: "rejected" },
+                {
+                    where: { wishId: { [Op.in]: batch } },
+                    transaction,
+                }
+            );
+        }
+
+        await transaction.commit();
+
+        return {
+            message: "Đã lọc và cập nhật kết quả tuyển sinh thành công.",
+            processed: wishes.length,
+            accepted: acceptedWishes.length,
+            rejected: rejectedWishes.length,
+            quotaUsage: quotaUsed,
+        };
+    } catch (error) {
+        await transaction.rollback();
+        throw new ApiError(500, `Lỗi trong quá trình lọc: ${error.message}`);
     }
-    // Cập nhật kết quả vào DB
-    const acceptedIds = acceptedWishes.map((w) => w.wishId);
-    const updatePromises = wishes.map((wish) => {
-        const status = acceptedIds.includes(wish.wishId) ? "accepted" : "rejected";
-        return AdmissionWishes.update({ status }, { where: { wishId: wish.wishId } });
-    });
-    await Promise.all(updatePromises);
-    return {
-        message: "Đã lọc và cập nhật kết quả tuyển sinh thành công.",
-    };
 };
 
 export const resetAllWishesStatus = async () => {
@@ -657,11 +704,11 @@ export const getAllUsersWithWishes = async () => {
         // Lấy tất cả users để reviewer có thể xét duyệt tất cả hồ sơ (kể cả chưa có nguyện vọng)
         const users = await User.findAll({
             where: {
-                role: 'user' // Chỉ lấy user thường, không lấy admin/reviewer
+                role: "user", // Chỉ lấy user thường, không lấy admin/reviewer
             },
             attributes: ["userId", "name", "email"],
         });
-        
+
         return users;
     } catch (error) {
         console.error("Error in getAllUsersWithWishes:", error);
@@ -682,12 +729,12 @@ export const deleteAdmissionWish = async (wishId, userId, userRole) => {
     }
 
     // Check permission: user can only delete their own wishes, admin can delete any
-    if (userRole !== 'admin' && wish.uId !== userId) {
+    if (userRole !== "admin" && wish.uId !== userId) {
         throw new ApiError(403, "Bạn không có quyền xóa nguyện vọng này.");
     }
 
     // Check if wish is already accepted
-    if (wish.status === 'accepted') {
+    if (wish.status === "accepted") {
         throw new ApiError(400, "Không thể xóa nguyện vọng đã được chấp nhận.");
     }
 
@@ -703,14 +750,11 @@ export const deleteAdmissionWish = async (wishId, userId, userRole) => {
     });
 
     // Update priorities of remaining wishes
-    const remainingWishes = userWishes.filter(w => w.wishId !== parseInt(wishId));
+    const remainingWishes = userWishes.filter((w) => w.wishId !== parseInt(wishId));
     const updatePromises = remainingWishes.map((w, index) => {
         const newPriority = index + 1;
         if (w.priority !== newPriority) {
-            return AdmissionWishes.update(
-                { priority: newPriority },
-                { where: { wishId: w.wishId } }
-            );
+            return AdmissionWishes.update({ priority: newPriority }, { where: { wishId: w.wishId } });
         }
         return Promise.resolve();
     });
@@ -1006,7 +1050,7 @@ export const exportWishesToPDF = async (userId) => {
             <div class="university-main">TRƯỜNG ĐẠI HỌC SƯ PHẠM KỸ THUẬT TP.HCM</div>
             <div class="university-english">HO CHI MINH CITY UNIVERSITY OF TECHNOLOGY AND EDUCATION</div>
             <div class="document-number">Số: ........./ĐKXTNV-${new Date().getFullYear()}</div>
-            
+
             <div class="form-title">PHIẾU ĐĂNG KÝ NGUYỆN VỌNG XÉT TUYỂN</div>
             <div class="form-subtitle">Admission Application Form</div>
             <div class="academic-year">NĂM HỌC ${new Date().getFullYear()}-${new Date().getFullYear() + 1}</div>
@@ -1017,15 +1061,15 @@ export const exportWishesToPDF = async (userId) => {
             <table class="info-table">
                 <tr>
                     <td class="info-label">Họ và tên thí sinh:</td>
-                    <td class="info-value">${user.name || '.............................'}</td>
+                    <td class="info-value">${user.name || "............................."}</td>
                     <td class="info-label">Mã số thí sinh:</td>
                     <td class="info-value">${userId}</td>
                 </tr>
                 <tr>
                     <td class="info-label">Email:</td>
-                    <td class="info-value">${user.email || '.............................'}</td>
+                    <td class="info-value">${user.email || "............................."}</td>
                     <td class="info-label">Ngày đăng ký:</td>
-                    <td class="info-value">${new Date().toLocaleDateString('vi-VN')}</td>
+                    <td class="info-value">${new Date().toLocaleDateString("vi-VN")}</td>
                 </tr>
                 <tr>
                     <td class="info-label">Số điện thoại:</td>
@@ -1050,15 +1094,18 @@ export const exportWishesToPDF = async (userId) => {
                     </tr>
                 </thead>
                 <tbody>
-                    ${wishes.map((wish, index) => {
-                        const wishData = wish.get ? wish.get({ plain: true }) : wish;
-                        
-                        return `
+                    ${wishes
+                        .map((wish, index) => {
+                            const wishData = wish.get ? wish.get({ plain: true }) : wish;
+
+                            return `
                             <tr>
                                 <td>${index + 1}</td>
                                 <td class="priority-col">${wishData.priority}</td>
                                 <td class="major-col">
-                                    <span class="major-name">${wishData.AdmissionMajor?.majorName || wishData.majorId}</span>
+                                    <span class="major-name">${
+                                        wishData.AdmissionMajor?.majorName || wishData.majorId
+                                    }</span>
                                     <span class="major-code">Mã ngành: ${wishData.majorId}</span>
                                 </td>
                                 <td>${wishData.AdmissionCriterium?.criteriaName || wishData.criteriaId}</td>
@@ -1066,10 +1113,11 @@ export const exportWishesToPDF = async (userId) => {
                                     ${wishData.AdmissionBlock?.admissionBlockName || wishData.admissionBlockId}<br>
                                     <small style="font-size: 10px; color: #666;">(${wishData.admissionBlockId})</small>
                                 </td>
-                                <td class="score-col">${wishData.scores ? wishData.scores.toFixed(2) : '---'}</td>
+                                <td class="score-col">${wishData.scores ? wishData.scores.toFixed(2) : "---"}</td>
                             </tr>
                         `;
-                    }).join('')}
+                        })
+                        .join("")}
                 </tbody>
             </table>
         </div>
@@ -1077,12 +1125,12 @@ export const exportWishesToPDF = async (userId) => {
         <div class="declaration-section">
             <div class="declaration-title">CAM ĐOAN</div>
             <div class="declaration-text">
-                Tôi xin cam đoan rằng tất cả các thông tin đã khai trong phiếu đăng ký này là đúng sự thật. 
-                Nếu có sai sót, tôi xin hoàn toàn chịu trách nhiệm và chấp nhận mọi hình thức xử lý của nhà trường 
+                Tôi xin cam đoan rằng tất cả các thông tin đã khai trong phiếu đăng ký này là đúng sự thật.
+                Nếu có sai sót, tôi xin hoàn toàn chịu trách nhiệm và chấp nhận mọi hình thức xử lý của nhà trường
                 theo quy định hiện hành.
             </div>
             <div class="declaration-text">
-                Tôi đã đọc và hiểu rõ các quy định về xét tuyển của trường và cam kết thực hiện đúng 
+                Tôi đã đọc và hiểu rõ các quy định về xét tuyển của trường và cam kết thực hiện đúng
                 các quy định này trong suốt quá trình học tập.
             </div>
         </div>
@@ -1100,11 +1148,13 @@ export const exportWishesToPDF = async (userId) => {
                     <td>
                         <div class="signature-box">
                             <div class="signature-date">
-                                TP.Hồ Chí Minh, ngày ${new Date().getDate()} tháng ${new Date().getMonth() + 1} năm ${new Date().getFullYear()}
+                                TP.Hồ Chí Minh, ngày ${new Date().getDate()} tháng ${
+        new Date().getMonth() + 1
+    } năm ${new Date().getFullYear()}
                             </div>
                             <div class="signature-title">Thí sinh</div>
                             <div class="signature-name">
-                                ${user.name || '(Ký và ghi rõ họ tên)'}
+                                ${user.name || "(Ký và ghi rõ họ tên)"}
                             </div>
                         </div>
                     </td>
@@ -1113,162 +1163,172 @@ export const exportWishesToPDF = async (userId) => {
         </div>
 
         <div style="margin-top: 20px; text-align: center; font-size: 10px; color: #666; border-top: 1px solid #ddd; padding-top: 10px;">
-            <em>Phiếu được tạo tự động từ hệ thống vào lúc ${new Date().toLocaleString('vi-VN')} - Mã số: HCMUTE-${userId}-${Date.now().toString().slice(-6)}</em>
+            <em>Phiếu được tạo tự động từ hệ thống vào lúc ${new Date().toLocaleString(
+                "vi-VN"
+            )} - Mã số: HCMUTE-${userId}-${Date.now().toString().slice(-6)}</em>
         </div>
     </body>
     </html>
     `;
 
     // Environment detection
-    const isProduction = process.env.NODE_ENV === 'production';
+    const isProduction = process.env.NODE_ENV === "production";
     const isHeroku = !!process.env.DYNO;
-    
-    console.log('PDF Generation Environment:', { isProduction, isHeroku, userId });
+
+    console.log("PDF Generation Environment:", { isProduction, isHeroku, userId });
 
     // Use Puppeteer to create PDF with enhanced Heroku support
     let browser = null;
     let retries = isHeroku ? 2 : 3; // Fewer retries on Heroku
-    
+
     while (retries > 0) {
         try {
             console.log(`PDF creation attempt ${(isHeroku ? 2 : 3) - retries + 1} for user:`, userId);
-            
+
             // Configure Puppeteer launch options
             let launchOptions = {
-                headless: 'new',
+                headless: "new",
                 timeout: 30000, // Reduced timeout for Heroku
                 args: [
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--disable-gpu',
-                    '--disable-web-security',
-                    '--disable-features=VizDisplayCompositor',
-                    '--disable-extensions',
-                    '--disable-plugins',
-                    '--disable-background-timer-throttling',
-                    '--disable-backgrounding-occluded-windows',
-                    '--disable-renderer-backgrounding',
-                    '--disable-default-apps',
-                    '--no-first-run',
-                    '--no-zygote'
-                ]
+                    "--no-sandbox",
+                    "--disable-setuid-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-gpu",
+                    "--disable-web-security",
+                    "--disable-features=VizDisplayCompositor",
+                    "--disable-extensions",
+                    "--disable-plugins",
+                    "--disable-background-timer-throttling",
+                    "--disable-backgrounding-occluded-windows",
+                    "--disable-renderer-backgrounding",
+                    "--disable-default-apps",
+                    "--no-first-run",
+                    "--no-zygote",
+                ],
             };
-            
+
             // Heroku-specific configuration
             if (isHeroku) {
                 // Try multiple Chrome paths for Heroku
                 const possibleChromePaths = [
                     process.env.GOOGLE_CHROME_BIN,
-                    '/app/.chrome-for-testing/chrome-linux64/chrome',
-                    '/app/.apt/usr/bin/google-chrome-stable',
-                    '/app/.apt/opt/google/chrome/chrome',
-                    '/usr/bin/google-chrome-stable',
-                    '/usr/bin/chromium-browser'
+                    "/app/.chrome-for-testing/chrome-linux64/chrome",
+                    "/app/.apt/usr/bin/google-chrome-stable",
+                    "/app/.apt/opt/google/chrome/chrome",
+                    "/usr/bin/google-chrome-stable",
+                    "/usr/bin/chromium-browser",
                 ].filter(Boolean);
-                
+
                 if (possibleChromePaths.length > 0) {
                     launchOptions.executablePath = possibleChromePaths[0];
                 }
-                
+
                 // Additional Heroku-specific args
                 launchOptions.args.push(
-                    '--single-process',
-                    '--memory-pressure-off',
-                    '--max_old_space_size=460',
-                    '--disable-background-networking',
-                    '--disable-default-apps',
-                    '--disable-sync'
+                    "--single-process",
+                    "--memory-pressure-off",
+                    "--max_old_space_size=460",
+                    "--disable-background-networking",
+                    "--disable-default-apps",
+                    "--disable-sync"
                 );
-                
-                console.log('Heroku Chrome config:', {
+
+                console.log("Heroku Chrome config:", {
                     executablePath: launchOptions.executablePath,
-                    args: launchOptions.args.length
+                    args: launchOptions.args.length,
                 });
             }
-            
+
             browser = await puppeteer.launch(launchOptions);
-            
+
             const page = await browser.newPage();
-            
+
             // Optimized page configuration for Heroku
-            await page.setViewport({ 
-                width: 1024, 
-                height: 1448
+            await page.setViewport({
+                width: 1024,
+                height: 1448,
             });
-            
+
             // Set reduced timeout for Heroku
             const pageTimeout = isHeroku ? 20000 : 60000;
-            
+
             // Set content with reduced wait conditions for Heroku
-            await page.setContent(htmlTemplate, { 
-                waitUntil: isHeroku ? 'domcontentloaded' : ['load', 'domcontentloaded'],
-                timeout: pageTimeout 
+            await page.setContent(htmlTemplate, {
+                waitUntil: isHeroku ? "domcontentloaded" : ["load", "domcontentloaded"],
+                timeout: pageTimeout,
             });
-            
+
             // Shorter wait time for Heroku
-            await new Promise(resolve => setTimeout(resolve, isHeroku ? 1000 : 2000));
-            
+            await new Promise((resolve) => setTimeout(resolve, isHeroku ? 1000 : 2000));
+
             // Generate PDF with reduced options for Heroku
             const pdfOptions = {
-                format: 'A4',
+                format: "A4",
                 printBackground: true,
                 margin: {
-                    top: '20mm',
-                    right: '15mm',
-                    bottom: '20mm',
-                    left: '15mm'
+                    top: "20mm",
+                    right: "15mm",
+                    bottom: "20mm",
+                    left: "15mm",
                 },
-                timeout: pageTimeout
+                timeout: pageTimeout,
             };
-            
+
             const pdfBuffer = await page.pdf(pdfOptions);
-            
-            console.log('PDF created successfully, buffer size:', pdfBuffer.length, 'Environment:', { isHeroku, isProduction });
-            
+
+            console.log("PDF created successfully, buffer size:", pdfBuffer.length, "Environment:", {
+                isHeroku,
+                isProduction,
+            });
+
             // Validate PDF buffer
             if (!pdfBuffer || pdfBuffer.length === 0) {
-                throw new Error('PDF buffer is empty');
+                throw new Error("PDF buffer is empty");
             }
-            
+
             if (pdfBuffer.length < 1000) {
-                throw new Error('PDF buffer too small, likely corrupted');
+                throw new Error("PDF buffer too small, likely corrupted");
             }
-            
+
             // Success
             return pdfBuffer;
-            
         } catch (error) {
             retries--;
             console.error(`PDF creation attempt failed (${retries} retries left):`, {
                 message: error.message,
                 name: error.name,
                 isHeroku,
-                userId
+                userId,
             });
-            
+
             // On Heroku, fail fast after 1 retry
             if (retries === 0 || (isHeroku && retries <= 0)) {
-                console.error('All PDF creation attempts failed for user:', userId, 'Environment:', { isHeroku, isProduction });
-                
+                console.error("All PDF creation attempts failed for user:", userId, "Environment:", {
+                    isHeroku,
+                    isProduction,
+                });
+
                 // Specific error message for Heroku
-                if (isHeroku && (error.message.includes('Chrome') || error.message.includes('browser'))) {
-                    throw new ApiError(503, `Dịch vụ tạo PDF tạm thời không khả dụng trên hệ thống. Vui lòng thử lại sau ít phút.`);
+                if (isHeroku && (error.message.includes("Chrome") || error.message.includes("browser"))) {
+                    throw new ApiError(
+                        503,
+                        `Dịch vụ tạo PDF tạm thời không khả dụng trên hệ thống. Vui lòng thử lại sau ít phút.`
+                    );
                 } else {
                     throw new ApiError(500, `Không thể tạo file PDF: ${error.message}. Vui lòng thử lại sau.`);
                 }
             } else {
                 // Wait before retry (shorter on Heroku)
-                await new Promise(resolve => setTimeout(resolve, isHeroku ? 500 : 1000));
+                await new Promise((resolve) => setTimeout(resolve, isHeroku ? 500 : 1000));
             }
         } finally {
             // Always close the browser
             if (browser) {
                 try {
                     await browser.close();
-                    console.log('Browser closed successfully');
+                    console.log("Browser closed successfully");
                 } catch (closeError) {
-                    console.error('Error closing browser:', closeError);
+                    console.error("Error closing browser:", closeError);
                 }
                 browser = null;
             }
@@ -1375,10 +1435,10 @@ const createSimpleHTMLResponse = (user, wishes) => {
 
         <div class="info-section">
             <h3>I. Thông tin thí sinh</h3>
-            <p><strong>Họ và tên:</strong> ${user.name || 'Chưa cập nhật'}</p>
-            <p><strong>Email:</strong> ${user.email || 'Chưa cập nhật'}</p>
+            <p><strong>Họ và tên:</strong> ${user.name || "Chưa cập nhật"}</p>
+            <p><strong>Email:</strong> ${user.email || "Chưa cập nhật"}</p>
             <p><strong>Mã thí sinh:</strong> ${user.userId}</p>
-            <p><strong>Ngày đăng ký:</strong> ${new Date().toLocaleDateString('vi-VN')}</p>
+            <p><strong>Ngày đăng ký:</strong> ${new Date().toLocaleDateString("vi-VN")}</p>
             <p><strong>Tổng số nguyện vọng:</strong> ${wishes.length}</p>
         </div>
 
@@ -1396,9 +1456,10 @@ const createSimpleHTMLResponse = (user, wishes) => {
                     </tr>
                 </thead>
                 <tbody>
-                    ${wishes.map((wish, index) => {
-                        const wishData = wish.get ? wish.get({ plain: true }) : wish;
-                        return `
+                    ${wishes
+                        .map((wish, index) => {
+                            const wishData = wish.get ? wish.get({ plain: true }) : wish;
+                            return `
                             <tr>
                                 <td style="text-align: center;">${index + 1}</td>
                                 <td class="priority">${wishData.priority}</td>
@@ -1411,10 +1472,11 @@ const createSimpleHTMLResponse = (user, wishes) => {
                                     ${wishData.AdmissionBlock?.admissionBlockName || wishData.admissionBlockId}
                                     <br><small>(${wishData.admissionBlockId})</small>
                                 </td>
-                                <td class="score">${wishData.scores ? wishData.scores.toFixed(2) : '---'}</td>
+                                <td class="score">${wishData.scores ? wishData.scores.toFixed(2) : "---"}</td>
                             </tr>
                         `;
-                    }).join('')}
+                        })
+                        .join("")}
                 </tbody>
             </table>
         </div>
@@ -1422,15 +1484,17 @@ const createSimpleHTMLResponse = (user, wishes) => {
         <div class="info-section">
             <h3>III. Cam đoan</h3>
             <p style="text-align: justify;">
-                Tôi xin cam đoan rằng tất cả các thông tin đã khai trong phiếu đăng ký này là đúng sự thật. 
-                Nếu có sai sót, tôi xin hoàn toàn chịu trách nhiệm và chấp nhận mọi hình thức xử lý của nhà trường 
+                Tôi xin cam đoan rằng tất cả các thông tin đã khai trong phiếu đăng ký này là đúng sự thật.
+                Nếu có sai sót, tôi xin hoàn toàn chịu trách nhiệm và chấp nhận mọi hình thức xử lý của nhà trường
                 theo quy định hiện hành.
             </p>
             <div style="margin-top: 40px; text-align: right;">
-                <p><em>TP.Hồ Chí Minh, ngày ${new Date().getDate()} tháng ${new Date().getMonth() + 1} năm ${new Date().getFullYear()}</em></p>
+                <p><em>TP.Hồ Chí Minh, ngày ${new Date().getDate()} tháng ${
+        new Date().getMonth() + 1
+    } năm ${new Date().getFullYear()}</em></p>
                 <p style="margin-top: 20px;"><strong>Thí sinh</strong></p>
                 <p style="margin-top: 60px; border-top: 1px solid #000; display: inline-block; padding-top: 5px;">
-                    <strong>${user.name || '(Ký và ghi rõ họ tên)'}</strong>
+                    <strong>${user.name || "(Ký và ghi rõ họ tên)"}</strong>
                 </p>
             </div>
         </div>
@@ -1438,7 +1502,7 @@ const createSimpleHTMLResponse = (user, wishes) => {
         <div class="footer">
             <p><strong>Ghi chú:</strong> Phiếu đăng ký này có giá trị pháp lý</p>
             <p>Liên hệ: (028) 3896 7641 - Email: tuyensinh@hcmute.edu.vn</p>
-            <p><em>Phiếu được tạo tự động từ hệ thống vào lúc ${new Date().toLocaleString('vi-VN')}</em></p>
+            <p><em>Phiếu được tạo tự động từ hệ thống vào lúc ${new Date().toLocaleString("vi-VN")}</em></p>
         </div>
     </body>
     </html>
